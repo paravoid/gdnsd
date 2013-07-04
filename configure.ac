@@ -1,8 +1,8 @@
-AC_PREREQ([2.68])
+AC_PREREQ([2.67])
 AC_INIT([gdnsd],[1.8.3],[blblack@gmail.com],[gdnsd],[https://github.com/blblack/gdnsd])
 AC_CONFIG_SRCDIR([gdnsd/main.c])
 AC_CONFIG_AUX_DIR([acaux])
-AM_INIT_AUTOMAKE([1.11.3 dist-xz no-dist-gzip foreign tar-ustar -Wall])
+AM_INIT_AUTOMAKE([1.11.1 dist-xz no-dist-gzip foreign tar-ustar -Wall])
 AC_CONFIG_MACRO_DIR([m4])
 AM_SILENT_RULES([yes])
 
@@ -33,7 +33,7 @@ dnl need to know endian-ness
 AC_C_BIGENDIAN
 
 dnl Apparently libtool+automake need this now...
-AM_PROG_AR
+m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
 
 dnl The libtool macros in 2.2.6b - 2.4.2 have a bug that causes
 dnl  them to accidentally add LIBADD_DLOPEN to LIBS permanently,
@@ -41,7 +41,7 @@ dnl  so we workaround that by saving and restoring LIBS
 XLIBS=$LIBS
 AC_DISABLE_STATIC
 LT_INIT([dlopen])
-LT_PREREQ([2.4.2])
+LT_PREREQ([2.2.6])
 LT_LIB_DLLOAD
 AC_SUBST([LIBTOOL_DEPS])
 AC_SUBST([LIBADD_DLOPEN])
