@@ -1,2 +1,0 @@
-gdnsd: hardening-no-fortify-functions usr/lib/*/gdnsd/*.so
-gdnsd: hardening-no-fortify-functions usr/lib/*/gdnsd/gdnsd_extmon_helper
