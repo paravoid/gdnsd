@@ -36,18 +36,3 @@ Description: authoritative domain name server
  DNSSEC.
  .
  This package provides the core gdnsd daemon and basic plugins.
-
-Package: gdnsd-dev
-Architecture: all
-Depends: ${misc:Depends}
-Section: libdevel
-Description: authoritative domain name server (development files)
- gdnsd is an Authoritative-only DNS server. The initial g stands for
- Geographic, as gdnsd offers a plugin system for geographic (or other sorts of)
- balancing, redirection, and service-state-conscious failover.
- .
- gdnsd has a strong focus on high performance, low latency service. It does
- not offer any form of caching or recursive service, and does not support
- DNSSEC.
- .
- This package provides header files useful to build third-party plugins.
