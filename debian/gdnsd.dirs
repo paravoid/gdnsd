@@ -1,4 +1,0 @@
-etc/gdnsd
-etc/gdnsd/zones
-etc/gdnsd/geoip
-var/lib/gdnsd

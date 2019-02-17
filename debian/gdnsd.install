@@ -1,4 +1,0 @@
-usr/sbin/gdnsd
-usr/bin/gdnsdctl
-usr/bin/gdnsd_geoip_test
-usr/lib/*/gdnsd/gdnsd_extmon_helper
