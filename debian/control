@@ -8,11 +8,13 @@ Build-Depends:
  libev-dev,
  libltdl-dev,
  libmaxminddb-dev (>= 1.2.0),
+ libsodium-dev,
  libunwind-dev [i386 amd64 ppc64 ppc64el powerpc powerpcspe armel armhf arm64 mips mipsel mips64el],
  liburcu-dev,
  perl,
  libhttp-daemon-perl,
  libio-socket-inet6-perl,
+ libnet-dns-perl,
  libsocket6-perl,
  libwww-perl
 Standards-Version: 4.3.0

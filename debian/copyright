@@ -6,22 +6,6 @@ Files: *
 Copyright: 2012-2019, Brandon L Black <blblack@gmail.com>
 License: GPL-3+
 
-Files: t/Net/*
-Copyright: 1997-2002, Michael Fuhr
- 2002-2004, Chris Reinhardt
- 2005, Olaf Kolkman (RIPE NCC)
- 2005, Olaf Kolkman (NLnet Labs)
-License: Artistic or GPL-1+
- All rights reserved. This program is free software; you may redistribute it
- and/or modify it under the same terms as Perl itself.
- .
- Perl is distributed under your choice of the GNU General Public License or the
- Artistic License.
- .
- On Debian systems, the complete text of the GNU General Public License can be
- found in "/usr/share/common-licenses/GPL" and the Artistic License in
- "/usr/share/common-licenses/Artistic".
-
 Files: debian/*
 Copyright: 2012-2019, Faidon Liambotis <paravoid@debian.org>
 License: GPL-3+
