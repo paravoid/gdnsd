@@ -4,7 +4,7 @@ set -e
 if test "$1" = "configure"; then
     if ! getent passwd gdnsd > /dev/null; then
         adduser --quiet --system --group \
-		--home /var/run/gdnsd \
+		--home /run/gdnsd \
 		--no-create-home \
 		gdnsd
     fi

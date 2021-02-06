@@ -17,11 +17,12 @@ endif
 override_dh_auto_configure:
 	dh_auto_configure -- \
 		--disable-silent-rules \
+		--with-rundir=/run \
 		$(DEBUG)
 
 override_dh_auto_install:
 	dh_auto_install
-	rmdir debian/gdnsd/var/run/gdnsd/
+	rmdir debian/gdnsd/run/gdnsd/ debian/gdnsd/run
 	rm -f debian/gdnsd/usr/share/doc/gdnsd/NEWS \
 	      debian/gdnsd/usr/share/doc/gdnsd/COPYING \
 	      debian/gdnsd/usr/share/doc/gdnsd/INSTALL \
