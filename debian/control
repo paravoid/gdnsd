@@ -17,7 +17,7 @@ Build-Depends:
  libnet-dns-perl,
  libsocket6-perl,
  libwww-perl
-Standards-Version: 4.3.0
+Standards-Version: 4.5.1
 Homepage: http://gdnsd.org/
 Vcs-Browser: https://github.com/paravoid/gdnsd
 Vcs-Git: https://github.com/paravoid/gdnsd.git
