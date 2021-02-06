@@ -1,1 +1,2 @@
 gdnsd: package-supports-alternative-init-but-no-init.d-script lib/systemd/system/gdnsd.service
+gdnsd: spare-manual-page usr/share/man/man8/gdnsd-plugin-*.8.gz
