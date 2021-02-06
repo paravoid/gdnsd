@@ -3,7 +3,7 @@ Section: net
 Priority: optional
 Maintainer: Faidon Liambotis <paravoid@debian.org>
 Build-Depends:
- debhelper (>= 11~),
+ debhelper-compat (= 13),
  ragel,
  libev-dev,
  libltdl-dev,
