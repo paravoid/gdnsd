@@ -1,3 +1,0 @@
-[submodule "t/libgdmaps/gdnsd-geoip-testdata-v3"]
-	path = t/libgdmaps/gdnsd-geoip-testdata-v3
-	url = https://github.com/gdnsd/gdnsd-geoip-testdata-v3.git

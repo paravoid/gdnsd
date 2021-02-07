@@ -200,9 +200,9 @@ unsigned gdnsd_dname_to_string(const uint8_t* restrict dname, char* restrict str
     while ((llen = *dname++) && llen != 255U) {
         // output "label."
         for (uint8_t i = 0; i < llen; i++) {
-            uint8_t x = *dname++;
+            char x = (char)(*dname++);
             if (x > 0x20 && x < 0x7F) {
-                *str++ = (char)x;
+                *str++ = x;
             } else {
                 *str++ = '\\';
                 *str++ = '0' + (x / 100);
