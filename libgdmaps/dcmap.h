@@ -28,13 +28,10 @@
 #include <inttypes.h>
 #include <stdbool.h>
 
-typedef struct _dcmap dcmap_t;
+typedef struct dcmap dcmap_t;
 
-F_NONNULL F_WUNUSED
-dcmap_t* dcmap_new(vscf_data_t* map_cfg, dclists_t* dclists, const unsigned parent_def, const unsigned true_depth, const char* map_name, const bool allow_auto);
-
-F_NONNULL F_PURE
-uint32_t dcmap_lookup_loc(const dcmap_t* dcmap, const char* locstr);
+F_NONNULL F_WUNUSED F_RETNN
+dcmap_t* dcmap_new(const vscf_data_t* map_cfg, dclists_t* dclists, const unsigned parent_def, const unsigned true_depth, const char* map_name, const bool allow_auto);
 
 // size of "lookup" storage below, including terminal NUL
 #define DCMAP_LOOKUP_MAXLEN 128

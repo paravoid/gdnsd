@@ -19,18 +19,25 @@ export TEST_CPUS
 case "$GDNSD_TRAVIS_BUILD" in
     optimized)
         CFLAGS=-O3 ./configure
-        make -j$TEST_CPUS check
+        SLOW_TESTS=1 make -j$TEST_CPUS check
     ;;
-    coveralls)
-        CFLAGS="-O0 -g -fprofile-arcs -ftest-coverage -fno-omit-frame-pointer" CPPFLAGS="-DDMN_NO_UNREACH_BUILTIN -DDMN_NO_FATAL_COVERAGE -DDMN_COVERTEST_EXIT" ./configure --without-hardening
-        make -j$TEST_CPUS
-        lcov -c -i -d . -o gdnsd-base.info
-        make check
-        lcov -c -d . -o gdnsd-test.info
-        lcov -a gdnsd-base.info -a gdnsd-test.info -o gdnsd-tested.info
-        # This filters out the ragel-generated parsers, the inlines from liburcu, and any test-only sources
-        lcov -o gdnsd-filtered.info -r gdnsd-tested.info zscan_rfc1035.c vscf.c urcu-qsbr.h 't/lib*/*.c'
-        coveralls-lcov gdnsd-filtered.info
+    developer)
+        ./configure --enable-developer
+        SLOW_TESTS=1 make -j$TEST_CPUS check
+    ;;
+    sonarcloud)
+        if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then
+            echo "Skipping Sonar checks for pull requests (encrypted env var issue)"
+            exit 0
+        fi
+        CFLAGS="-O0 -g -fprofile-arcs -ftest-coverage" CPPFLAGS="-DGDNSD_NO_UNREACH_BUILTIN -DGDNSD_NO_FATAL_COVERAGE -DGDNSD_COVERTEST_EXIT" ./configure --without-hardening
+        SLOW_TESTS=1 make -j$TEST_CPUS check
+        gcov -a -b -p src/*.o src/plugins/*.o libgdmaps/*.o libgdnsd/*.o
+        make clean
+        ./configure --disable-developer --without-hardening
+        build-wrapper-linux-x86-64 --out-dir bw-output make -j$TEST_CPUS
+        git fetch --unshallow --quiet
+        sonar-scanner -Dsonar.cfamily.threads=$TEST_CPUS -Dsonar.projectVersion=`git describe --match "v[0-9]*" --always --dirty` -Dsonar.branch.name=$TRAVIS_BRANCH
     ;;
     *)
         echo "Invalid GDNSD_TRAVIS_BUILD: $GDNSD_TRAVIS_BUILD"

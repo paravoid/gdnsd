@@ -6,9 +6,15 @@ if [ ! -f $PWD/qa/gdnsd.supp ]; then
 fi
 set -x
 set -e
-CPPFLAGS="-DDMN_COVERTEST_EXIT" CFLAGS="-O0" ./configure --enable-developer --without-hardening
+CPPFLAGS="-DGDNSD_COVERTEST_EXIT" CFLAGS="-O0" ./configure --enable-developer --without-hardening
 make clean
-TEST_RUNNER="libtool --mode=execute valgrind --error-exitcode=99 --leak-check=full --suppressions=$PWD/qa/gdnsd.supp" make check
+make
+SLOW_TESTS=1 TEST_RUNNER="valgrind --trace-children=yes --trace-children-skip=/bin/true,/bin/false,/bin/sh --error-exitcode=99 --leak-check=full --suppressions=$PWD/qa/gdnsd.supp" make check
 set +e
 set +x
-grep "ERROR SUM" t/testout/*/gdnsd.out | grep -v ' 0 errors'
+grep "ERROR SUM" t/testout/*/*.out | grep -v ' 0 errors'
+if [ $? -eq 0 ]; then
+    exit 1;
+else
+    exit 0;
+fi

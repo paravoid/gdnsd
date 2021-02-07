@@ -54,8 +54,8 @@ just cover a few important highlights and/or deviations from the norm.
 
 =head1 DIRECTIVES
 
-The standard C<$TTL> and C<$ORIGIN> directives
-are supported with their normal syntax and semantics.
+The standard C<$TTL>, C<$ORIGIN>, and C<$INCLUDE> directives
+are supported with their normal syntax and semantics:
 
 C<$TTL> changes the default TTL of any records coming after it,
 and can occur multiple times.  Note that in the absence of a
@@ -71,30 +71,51 @@ name, in which case the previous origin is appended to it.
 Any fully-qualified C<$ORIGIN> must be within the zone described
 by this zonefile.  The default origin is the zone name itself.
 
-C<$ADDR_LIMIT_V4> is a non-standard, gdnsd-specific directive.
-It requires a single unsigned integer argument.  The argument
-limits the total number of C<A> records to include in the server's
-responses for any given C<A> rrset (whether static or dynamic).
-The default limit is zero, which is interpreted as no limit.
-Setting the limit via this directive affects all rrsets until
-the value is changed again by another directive.  gdnsd always
-rotates the RRs of an address RR-set in a round-robin fashion,
-and this rotation occurs before the limit is applied, allowing
-a small pseudo-random subset of a larger list to be delivered
-via this mechanism.
-
-C<$ADDR_LIMIT_V6> same as above, but for IPv6 C<AAAA> rrsets.
-
-The RFC-standard C<$INCLUDE> directive is not supported because
-it would greatly complicate the detection of zone update
-transactions with our current filesystem-based change detection
-scheme.  Most legitimate uses of C<$INCLUDE> to reduce redundancy
-should be replaced with a zonefile-generating script instead,
-perhaps using a template system.
+C<$INCLUDE> includes another file as if its contents existed
+at the point of the C<$INCLUDE> directive.  Include directives
+may specify an optional origin, which has the same effect
+as C<$ORIGIN> at the top of the included file.  Changes to
+the origin (and default ttl) within included files have no
+effect on the outer file.
 
 BIND's C<$GENERATE> extension is not supported at this time, but
 there's no fundamental reason it couldn't be added at a later
 date.
+
+=head1 SPECIAL NAMES AND ORIGINS
+
+The standard C<@>, as a whole name, is supported as an alias for the current
+origin.  In addition to this, gdnsd implements two special extensions C<@Z> and
+C<@F>.  These denote the current zone name, and the original origin (before any
+internal C<$ORIGIN> declarations) of the file currently being parsed.  Unlike
+C<@>, they can also be used as the final label of an unqualified name.  C<@Z>
+and C<@F> will always be equivalent to each other in the main zonefile for a
+zone, but may differ when parsing included files from "$INCLUDE".  As an example:
+
+
+    * zones/example.org has the line "$INCLUDE includes/foo foo"
+    * zones/includes/foo has these lines:
+       $ORIGIN bar
+       asdf A 192.0.2.1
+       $ORIGIN baz.@F
+       asdf A 192.0.2.2
+       $ORIGIN quux.@Z
+       asdf A 192.0.2.3
+    * This results in creating all of these:
+       asdf.bar.foo.example.org A 192.0.2.1
+       asdf.baz.foo.example.org A 192.0.2.2
+       asdf.quux.example.org    A 192.0.2.3
+
+
+Note that the origin changes accomplished with C<@F> and C<@Z> backtrack
+towards the root of the name hierarchy, and thus wouldn't normally be possible
+without explicitly using the zone name itself.  The main benefit of these
+directives is they allow this kind of origin-switching behavior while keeping
+all zone data relative to the zone name rather than absolute.  When combined
+with the fact that the zones scanner will load symlinks, this means the above
+F<zones/example.org> could also be symlinked as F<zones/example.com>, loading
+all the same files and providing an identical tree of data under the other zone
+name without conflict.
 
 =head1 SUPPORTED RESOURCE RECORD TYPES
 
@@ -105,6 +126,7 @@ standard RDATA formats:
 
 traditional: SOA, A, AAAA, NS, PTR, CNAME, MX, SRV, TXT, NAPTR
 non-traditional: CAA
+explicitly unsupported: HINFO
 
 It also supports the generic format for unknown RR types documented
 in RFC 3597, which has syntax like:
@@ -116,9 +138,17 @@ in RFC 3597, which has syntax like:
 a pair of 5-byte hex strings.  See RFC 3597 itself for full
 details.
 
-gdnsd does not allow using the RFC3597 format to specify any of the
-traditional standard RR types, but it can be used to encode data for
-the non-traditional types.
+gdnsd does not allow using the RFC3597 format to specify any of the supported
+traditional standard RR types, but it can be used to encode data for the
+non-traditional types.  It's also not allowed to use RFC3597 to specify HINFO
+RRs, as these are now reserved in gdnsd for use in handling C<ANY> queries,
+using the RFC 8482 HINFO option.
+
+C<SOA> records' negative-caching TTL is set to the minimum of the traditional
+"minimum" (last) field (which always means "negative cache TTL" as of RFC
+2308), and the actual TTL of the SOA record itself.  This TTL is used as the
+actual TTL of the SOA record any time it is emitted, whether for negative or
+positive answers.
 
 Additionally, gdnsd supports two special-case, non-standard
 virtual resource record types DYNA and DYNC:
@@ -134,11 +164,14 @@ and it is up to the plugin code which addresses of which types
 to return in the response.
 
 The dynamic plugin lookup for C<DYNA> will be used anywhere that
-regular C<A> and/or C<AAAA> records would be used.  This includes
-not only direct responses to C<A> and C<AAAA> queries, but also
-things like Additional-section RRs and C<ANY>-query output.
-C<DYNA> cannot co-exist with actual static A or AAAA records
-at the same name, but can co-exist with any other RR-type.
+regular C<A> and/or C<AAAA> records would be used.  C<DYNA> cannot
+co-exist with actual static A or AAAA records at the same name, but can
+co-exist with any other RR-type.
+
+C<DYNA> and C<DYNAAAA> RRs B<cannot> be used to supply the addresses of
+nameservers.  In other words, any name that exists in zone scope on the
+right-hand-side of an C<NS> record cannot have C<DYNA> or C<DYNAAAA>
+(and relatedly, must have at least one of C<A> or C<AAAA>).
 
 Example:
 
@@ -154,10 +187,10 @@ rules.  Plugins results returned via C<DYNC> can be either addresses
 or a C<CNAME> record.  C<DYNC> cannot co-exist with B<any> other
 resource record at the same name, much like normal C<CNAME> RRs.
 This also implies that C<DYNC> cannot be used at the zone root,
-as the zone root requires C<NS> and C<SOA> RRs.  While C<DYNC>
-responses are included in C<ANY> queries for the given name,
-they are B<not> used in Additional-section processing, even
-when the plugin responds with address records rather than C<CNAME>.
+as the zone root requires C<NS> and C<SOA> RRs.
+
+C<DYNC>'s dynamic CNAME targets cannot be used to point at names in the same
+zonefile as the C<DYNC> record; they must be used to point at other zones.
 
 Example:
 
@@ -207,6 +240,9 @@ specify a single long chunk and have the server break it at
 255 byte boundaries automatically.  (this behavior can be
 disabled via L<gdnsd.config(5)> as well, which will turn
 oversized chunks into zonefile parsing errors).
+
+TXT records are limited to a maximum of 16000 bytes when encoded in rdata form
+for wire transmission.
 
 =head1 SEE ALSO
 

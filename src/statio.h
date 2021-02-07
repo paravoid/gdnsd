@@ -20,27 +20,20 @@
 #ifndef GDSND_STATIO_H
 #define GDSND_STATIO_H
 
-#include "socks.h"
-
 #include <gdnsd/compiler.h>
-
-#include <stdbool.h>
-
-#include <ev.h>
+#include <sys/types.h>
+#include <inttypes.h>
 
 F_NONNULL
-void statio_init(const socks_cfg_t* socks_cfg);
-void statio_bind_socks(void);
-F_NONNULL
-bool statio_check_socks(const socks_cfg_t* socks_cfg, bool soft);
+void statio_init(unsigned arg_num_dns_threads);
+
+F_NONNULL F_RETNN
+char* statio_get_json(time_t nowish, size_t* len);
+
+F_NONNULL F_MALLOC
+char* statio_serialize(size_t* dlen_p);
 
 F_NONNULL
-void statio_start(struct ev_loop* statio_loop_arg, const socks_cfg_t* socks_cfg);
-
-// main thread calls this to issue final stats output
-void statio_final_stats(void);
-
-// main thread calls this to wait on completion of the above
-void statio_final_stats_wait(void);
+void statio_deserialize(uint64_t* data, size_t dlen);
 
 #endif // GDSND_STATIO_H

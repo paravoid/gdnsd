@@ -23,17 +23,17 @@
 #include "socks.h"
 
 #include <gdnsd/compiler.h>
-#include <gdnsd/dmn.h>
+#include <gdnsd/net.h>
+
+// Called before threads are started, to initialize a thread registry used for stopping
+void dnsio_tcp_init(size_t num_threads);
+
+// Uses the above registry to ask threads to stop.  They will exit when
+// outstanding TCP connections drain due to close/timeout.
+void dnsio_tcp_request_threads_stop(void);
 
 F_NONNULL
 void* dnsio_tcp_start(void* thread_asvoid);
-
-// Retval is socket. This is common code re-used by the statio listener as well,
-//  the socket is created and set for non-block, TCP_DEFER_ACCEPT if available, IPV6_V6ONLY
-//  if the sockaddr in "asin" is V6, and SO_REUSEADDR.  The socket is fully ready
-//  for bind()+listen() when returned.
-F_NONNULL
-int tcp_listen_pre_setup(const dmn_anysin_t* asin, const unsigned timeout V_UNUSED);
 
 F_NONNULL
 void tcp_dns_listen_setup(dns_thread_t* t);

@@ -1,46 +1,14 @@
-AC_PREREQ([2.63])
-AC_INIT([gdnsd],[2.4.2],[https://github.com/gdnsd/gdnsd/issues])
+AC_PREREQ([2.64])
+AC_INIT([gdnsd],[3.5.0],[https://github.com/gdnsd/gdnsd/issues],[gdnsd],[https://gdnsd.org])
 AC_CONFIG_SRCDIR([src/main.c])
 AC_CONFIG_AUX_DIR([acaux])
-AM_INIT_AUTOMAKE([1.11.1 dist-xz no-dist-gzip foreign tar-ustar subdir-objects -Wall])
+AM_INIT_AUTOMAKE([1.13 dist-xz no-dist-gzip foreign tar-ustar subdir-objects -Wall])
 AC_CONFIG_MACRO_DIR([m4])
 AM_SILENT_RULES([yes])
 
-## Autoconf-2.63-Compat
-# Future reference: both of the below could be addressed by bumping our
-# AC_PREREQ() to 2.64.  It's just a question of at what point in the future
-# the 2.63-using distros are old enough that it's reasonable to do so.
-#---
-# We're compatible to autoconf 2.63, which doesn't have PACKAGE_URL
-#   as a final arg to AC_INIT.  We can't define it ourselves here
-#   with the same name as this causes compiler warnings that matter
-#   during other parts of ./configure.  So, pick a new name for now.
-AC_DEFINE([PKG_URL],["http://gdnsd.org"],[Package URL])
-#---
-# This hack makes PKG_CHECK_VARS from m4/pkg.m4 work on autoconf 2.63
-# ( courtesy of sunnybear in https://github.com/gdnsd/gdnsd/issues/85 )
-m4_ifndef([AS_VAR_COPY],
-[m4_define([AS_VAR_COPY],
-[AS_LITERAL_IF([$1[]$2], [$1=$$2], [eval $1=\$$2])])])
-## End Autoconf-2.63-Compat
-
-# TODO: when/if a new autoconf release has a C11 macro,
-#    prefer that and fall back to requiring C99.
-AC_PROG_CC_C99
-if test "x$ac_cv_prog_cc_c99" = xno; then
-    AC_MSG_ERROR([Your compiler lacks sufficient C99 support])
-fi
-# AC_PROG_CC_C99 has to come before this or we don't get a C99 CPP
+# We're hoping for C11, but anything C99 or higher will work
+AC_PROG_CC_STDC
 AC_USE_SYSTEM_EXTENSIONS
-
-# This is explcitly checked by CC_C99 above for now, but
-#   the C11 standard reversed course and made this an optional
-#   feature, so we may as well double-check here for future-proofing
-AC_C_VARARRAYS
-if test "x$ac_cv_c_vararrays" = xno; then
-    AC_MSG_ERROR([Your compiler lacks support for variable arrays])
-fi
-
 AM_PROG_CC_C_O
 
 # POSIX threads stuff
@@ -59,33 +27,27 @@ AC_COMPILE_IFELSE(
 [CLANG=yes], [CLANG=no])
 AC_MSG_RESULT([$CLANG])
 
-# need to know endian-ness
-AC_C_BIGENDIAN
-
-# pointer width...
+# Various type widths
 AC_CHECK_SIZEOF(uintptr_t)
+AC_CHECK_SIZEOF(size_t)
+AC_CHECK_SIZEOF(unsigned long)
+AC_CHECK_SIZEOF(unsigned long long)
 
-# Apparently libtool+automake need this now, in newer versions
-#   which have it at all
-m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
-
-# The libtool macros in 2.2.6b - 2.4.2 have a bug that causes
-#  them to accidentally add LIBADD_DLOPEN to LIBS permanently,
-#  so we workaround that by saving and restoring LIBS
-XLIBS=$LIBS
-AC_DISABLE_STATIC
-LT_INIT([dlopen])
-LT_PREREQ([2.2.6])
-LT_LIB_DLLOAD
-AC_SUBST([LIBTOOL_DEPS])
-AC_SUBST([LIBADD_DLOPEN])
-LIBS=$XLIBS
+# Some tooling we need in our makefiles
+AM_PROG_AR
+AC_PROG_RANLIB
+AC_PROG_LN_S
 
 # Check for --enable-developer
 developer=no
 AC_ARG_ENABLE([developer],
     [  --enable-developer      Turn on gcc developer warnings, debugging, etc (default=no)],
     [if test "x$enable_developer" = xyes; then developer=yes; fi])
+
+extrawarn=no
+AC_ARG_ENABLE([extrawarn],
+    [  --enable-extrawarn      Turn on excessive compiler warning flags (default=no, implied by --enable-developer)],
+    [if test "x$enable_extrawarn" = xyes; then extrawarn=yes; fi])
 
 # normal builds set -DNDEBUG because we make very very heavy
 #   use of assertions that really slow stuff down.
@@ -101,28 +63,6 @@ fi
 
 # These are only for urcu header stuff currently
 AC_DEFINE([_LGPL_SOURCE], 1, [LGPL-compatible source])
-AC_DEFINE([GDNSD_SOURCE_TREE], 1, [Identifies local source vs 3rd party])
-
-harden=1
-AC_ARG_WITH([hardening],[AS_HELP_STRING([--without-hardening],
-    [Disable compiler/linker flags for security hardening])],[
-    if test "x$withval" = xno; then
-        harden=0
-    fi
-])
-HARDEN_COMPILER=
-HARDEN_LINKER=
-CFLAGS_PIE=
-LDFLAGS_PIE=
-if test $harden = 1; then
-    AS_CASE([$CFLAGS], [*-O[[1-6]]*], [CPPFLAGS="-D_FORTIFY_SOURCE=2 ${CPPFLAGS}"])
-    HARDEN_COMPILER="-fstack-protector-all -ftrapv"
-    HARDEN_LINKER="-Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack"
-    AX_APPEND_COMPILE_FLAGS([-fPIE],[CFLAGS_PIE],[])
-    AX_APPEND_LINK_FLAGS([-pie],[LDFLAGS_PIE],[])
-fi
-AC_SUBST([CFLAGS_PIE])
-AC_SUBST([LDFLAGS_PIE])
 
 # clang does not fail on some unsupported options without this,
 #  but it screws up some of our warnflag tests on gcc as well.
@@ -131,116 +71,102 @@ if test $CLANG = yes; then
    CLANG_WERROR="-Werror"
 fi
 
-AX_APPEND_LINK_FLAGS([\
-    $HARDEN_LINKER \
-    -Wl,--as-needed \
-    -Wl,--gc-sections \
-],[LDFLAGS],[$CLANG_WERROR])
+harden=1
+AC_ARG_WITH([hardening],[AS_HELP_STRING([--without-hardening],
+    [Disable compiler/linker flags for security hardening])],[
+    if test "x$withval" = xno; then
+        harden=0
+    fi
+])
+if test $harden = 1; then
+    AS_CASE([$CFLAGS], [*-O[[1-6]]*], [CPPFLAGS="-D_FORTIFY_SOURCE=2 ${CPPFLAGS}"])
+    AX_APPEND_COMPILE_FLAGS([-fPIE -fstack-protector-strong -fstack-clash-protection -fexceptions -ftrapv],[CFLAGS],[$CLANG_WERROR])
+    if test $CLANG != yes; then
+        # We'll only turn this on by default for real GCC-8 for now, because at
+        # least clang-7 seems to cause all binutils (ranlib, ar, ld) to emit
+        # strange errors on Linux with fcf-protection (yet linking succeeds
+        # anyways, which is odd in itself).  The errors look like:
+        # /usr/bin/ld: error: src/src_gdnsd-main.o: <corrupt x86 feature size: 0x8>
+        AX_APPEND_COMPILE_FLAGS([-mshstk -fcf-protection=full],[CFLAGS],[])
+    fi
+    AX_APPEND_LINK_FLAGS([-pie -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack],[LDFLAGS],[$CLANG_WERROR])
+fi
 
 AX_APPEND_COMPILE_FLAGS([\
     $TRY_DEBUG_CFLAGS \
-    $HARDEN_COMPILER \
-    -fvisibility=hidden \
-    -ffunction-sections \
-    -fdata-sections \
     -fno-common \
     -pipe \
     -Wall \
-    -Wextra \
-    -Warray-bounds=2 \
-    -Wbad-function-cast \
-    -Wcast-align \
-    -Wcast-qual \
-    -Wduplicated-cond \
-    -Wendif-labels \
-    -Wfloat-equal \
-    -Wfloat-conversion \
-    -Wformat=2 \
-    -Wformat-signedness \
-    -Winit-self \
-    -Wjump-misses-init \
-    -Wlogical-op \
-    -Wloop-analysis \
-    -Wmissing-declarations \
-    -Wmissing-include-dirs \
-    -Wmissing-prototypes \
-    -Wnull-dereference \
-    -Wold-style-definition \
-    -Wpointer-arith \
-    -Wredundant-decls \
-    -Wshadow \
-    -Wsign-conversion \
-    -Wshift-overflow=2 \
-    -Wstrict-overflow=5 \
-    -Wstrict-prototypes \
-    -Wswitch-default \
-    -Wswitch-enum \
-    -Wtrampolines \
-    -Wundef \
-    -Wunused \
-    -Wwrite-strings \
-    -Wthis-does-not-exist \
+    -Wno-pragmas \
 ],[CFLAGS],[$CLANG_WERROR])
 
-# include libdmn configure stuff
-m4_include([libgdnsd/libdmn.m4])
+if test $developer = yes -o $extrawarn = yes; then
+    AX_APPEND_COMPILE_FLAGS([\
+        -Wextra \
+        -Waggregate-return \
+        -Walloca \
+        -Walloc-zero \
+        -Warray-bounds=2 \
+        -Wbad-function-cast \
+        -Wcast-align \
+        -Wcast-align=strict \
+        -Wcast-qual \
+        -Wdate-time \
+        -Wdouble-promotion \
+        -Wduplicated-branches \
+        -Wduplicated-cond \
+        -Wendif-labels \
+        -Werror=vla \
+        -Wfloat-equal \
+        -Wfloat-conversion \
+        -Wformat=2 \
+        -Wformat-signedness \
+        -Winit-self \
+        -Wjump-misses-init \
+        -Wlogical-op \
+        -Wloop-analysis \
+        -Wmissing-declarations \
+        -Wmissing-include-dirs \
+        -Wmissing-prototypes \
+        -Wnull-dereference \
+        -Wold-style-definition \
+        -Wpointer-arith \
+        -Wredundant-decls \
+        -Wshadow \
+        -Wsign-conversion \
+        -Wshift-overflow=2 \
+        -Wstrict-aliasing=3 \
+        -Wstrict-overflow=5 \
+        -Wstrict-prototypes \
+        -Wstringop-overflow=3 \
+        -Wswitch-default \
+        -Wswitch-enum \
+        -Wtrampolines \
+        -Wundef \
+        -Wuninitialized \
+        -Wunused \
+        -Wwrite-strings \
+        -Wthis-does-not-exist \
+    ],[CFLAGS],[$CLANG_WERROR])
+fi
+
+# Note "-Wno-pragmas" above is because our only use of pragmas is to suppress
+# warnings, and sometimes this in turn causes a warning on older GCC versions
+# that don't support the warning we're trying to suppress...
+
+# include libgdnsd configure stuff
+m4_include([libgdnsd/libgdnsd.m4])
 
 # include libgdmaps configure stuff
 m4_include([libgdmaps/libgdmaps.m4])
 
-# explicit check on math lib.  libev also does this, but
-#  might not in the future, and we need it directly
-XLIBS=$LIBS
-LIBS=""
-AC_CHECK_LIB(m,atan2)
-MATH_LIB=$LIBS
-LIBS=$XLIBS
-AC_SUBST([MATH_LIB])
-
-# posix_madvise to readahead on zonefiles
-AC_CHECK_FUNCS([posix_madvise])
-
-# high-precision mtime from struct stat
-AC_CHECK_MEMBERS([struct stat.st_mtim.tv_nsec])
-AC_CHECK_MEMBERS([struct stat.st_mtimespec.tv_nsec])
-AC_CHECK_MEMBERS([struct stat.st_mtimensec])
-
-# *mmsg for Linux
-HAS_SENDMMSG=1
-AC_CHECK_DECLS([sendmmsg, recvmmsg],,[HAS_SENDMMSG=0],[[#include <sys/socket.h>]])
-AC_CHECK_FUNCS([sendmmsg recvmmsg],,[HAS_SENDMMSG=0])
-if test $HAS_SENDMMSG -eq 1; then
-    AC_DEFINE([USE_SENDMMSG],1,[Linux sendmmsg is usable])
+# Linux, FreeBSD, and NetBSD all have this these days
+USE_MMSG=1
+AC_CHECK_DECLS([sendmmsg, recvmmsg, MSG_WAITFORONE],,[USE_MMSG=0],[[#include <sys/socket.h>]])
+AC_CHECK_FUNCS([sendmmsg recvmmsg],,[USE_MMSG=0])
+if test $USE_MMSG -eq 1; then
+    AC_DEFINE([USE_MMSG],1,[recvmmsg and sendmmsg look usable])
 fi
-
-# Network Stuff
-AC_DEFINE([__APPLE_USE_RFC_3542],1,[Force MacOS Lion and higher to use RFC3542 IPv6 stuff])
-
-# liburcu-qsbr
-KILL_QSBR=0
-AC_ARG_WITH([urcu],[AS_HELP_STRING([--without-urcu],
-    [Explicitly disable userspace-rcu detection])],[
-    if test "x$withval" = xno; then
-        KILL_QSBR=1
-    fi
-])
-
-GDNSD_B_QSBR=0
-QSBRLIBS=
-if test $KILL_QSBR -eq 0; then
-    AC_CHECK_HEADER(urcu-qsbr.h,[
-        XLIBS=$LIBS
-        LIBS=""
-        AC_CHECK_LIB([urcu-qsbr],[perror],[
-            GDNSD_B_QSBR=1
-            QSBRLIBS="-lurcu-qsbr"
-        ])
-        LIBS=$XLIBS
-    ])
-fi
-AC_DEFINE_UNQUOTED([GDNSD_B_QSBR], [$GDNSD_B_QSBR], [Use liburcu-qsbr])
-AC_SUBST([GDNSD_B_QSBR])
-AC_SUBST([QSBRLIBS])
 
 # systemd unit dir for "make install" of gdnsd.service
 PKG_CHECK_VAR([SYSD_UNITDIR], [systemd], [systemdsystemunitdir])
@@ -260,25 +186,8 @@ fi
 AC_SUBST([systemdsystemunitdir], [$with_systemdsystemunitdir])
 AM_CONDITIONAL(DO_SYSD_UNITFILE, [test -n "$with_systemdsystemunitdir"])
 
-# libev (which shouldn't use pkg-config anyways, but has
-#   to on Fedora because they munge the header path the author intended...)
-PKG_CHECK_MODULES([LIBEV],[libev >= 4.0],
-    CPPFLAGS="${CPPFLAGS} ${LIBEV_CFLAGS}"
-,
-    # try manually...
-    XLIBS=$LIBS
-    LIBS=""
-    AC_CHECK_LIB([ev],[ev_break],,AC_MSG_ERROR([libev 4.x library not found!]))
-    AC_CHECK_DECLS([EVBREAK_ALL],,AC_MSG_ERROR([libev 4.x headers not found!]),[
-        #include <ev.h>
-    ])
-    LIBEV_LIBS=$LIBS
-    LIBS=$XLIBS
-)
-AC_SUBST([LIBEV_LIBS])
-
 #---------------------------------------------
-# pthread setname (4 non-portable variants...)
+# pthread setname (3 non-portable variants...)
 #---------------------------------------------
 AC_CHECK_HEADERS([pthread_np.h])
 define(pthread_np_preamble,[
@@ -300,50 +209,28 @@ AC_LINK_IFELSE([AC_LANG_PROGRAM(pthread_np_preamble, [
   # 2-arg set_name (e.g. FreeBSD, OpenBSD)
   AC_MSG_CHECKING([for 2-arg pthread_set_name_np])
   AC_LINK_IFELSE([AC_LANG_PROGRAM(pthread_np_preamble, [
-      return pthread_set_name_np(pthread_self(), "foo");
+      pthread_set_name_np(pthread_self(), "foo");
   ])], [
     AC_DEFINE(HAVE_PTHREAD_SET_NAME_NP_2, 1, [2-arg pthread_set_name_np])
     AC_MSG_RESULT([yes])
   ], [
     AC_MSG_RESULT([no])
 
-    # 1-arg setname (e.g. Darwin)
-    AC_MSG_CHECKING([for 1-arg pthread_setname_np])
+    # 3-arg setname (e.g. NetBSD)
+    AC_MSG_CHECKING([for 3-arg pthread_setname_np])
     AC_LINK_IFELSE([AC_LANG_PROGRAM(pthread_np_preamble, [
-        return pthread_setname_np("foo");
+        return pthread_setname_np(pthread_self(), "foo", NULL);
     ])], [
-      AC_DEFINE(HAVE_PTHREAD_SETNAME_NP_1, 1, [1-arg pthread_setname_np])
+      AC_DEFINE(HAVE_PTHREAD_SETNAME_NP_3, 1, [3-arg pthread_setname_np])
       AC_MSG_RESULT([yes])
     ], [
       AC_MSG_RESULT([no])
-
-      # 3-arg setname (e.g. NetBSD)
-      AC_MSG_CHECKING([for 3-arg pthread_setname_np])
-      AC_LINK_IFELSE([AC_LANG_PROGRAM(pthread_np_preamble, [
-          return pthread_setname_np(pthread_self(), "foo", NULL);
-      ])], [
-        AC_DEFINE(HAVE_PTHREAD_SETNAME_NP_3, 1, [3-arg pthread_setname_np])
-        AC_MSG_RESULT([yes])
-      ], [
-        AC_MSG_RESULT([no])
-      ])
     ])
   ])
 ])
 #---------------------------------------------
 # end pthread_setname stuff
 #---------------------------------------------
-
-# == inotify stuff ==
-# inotify_init1() is Linux 2.6.27+ and glibc 2.9
-# We also use Linux 2.6.36+ / glibc 2.13 IN_EXCL_UNLINK, but we
-#   fix that with a manual ifndef for the define and a runtime
-#   kernel version check for the support
-USE_INOTIFY=1
-AC_CHECK_FUNCS([inotify_init1],,[USE_INOTIFY=0])
-if test $USE_INOTIFY -eq 1; then
-    AC_DEFINE([USE_INOTIFY], 1, [Linux 2.6.36+ inotify support])
-fi
 
 # Basic perl 5.10.1+
 AC_ARG_VAR([PERL],[path to Perl 5.10.1 or higher])
@@ -376,23 +263,11 @@ fi
 # various perl modules for the testsuites (optional)
 HAVE_TESTSUITE_MODULES=0
 AX_PROG_PERL_MODULES(
-    [Test::More JSON::PP Socket6 IO::Socket::INET6 HTTP::Daemon LWP],
+    [Test::More JSON::PP Socket6 IO::Socket::INET6 HTTP::Daemon Net::DNS=1.03],
     [HAVE_TESTSUITE_MODULES=1],
-    AC_MSG_WARN([[Cannot "make check" without Perl modules Test::More, JSON::PP, Socket6, IO::Socket::INET6, HTTP::Daemon, and LWP (aka libwww-perl)]])
+    AC_MSG_WARN([[Cannot "make check" without Perl modules Test::More, JSON::PP, Socket6, IO::Socket::INET6, HTTP::Daemon, and Net::DNS 1.03+]])
 )
 AC_SUBST([HAVE_TESTSUITE_MODULES])
-
-# Find ragel
-AC_ARG_VAR([RAGEL],[path to ragel version 6.x])
-if test "x$ac_cv_env_RAGEL_set" != "xset"; then
-    AC_PATH_PROG([RAGEL],[ragel],[missing])
-fi
-if test "x$RAGEL" = xmissing; then
-    AC_MSG_ERROR([Ragel not found])
-else
-    $RAGEL --version|$EGREP 'Ragel State Machine Compiler version 6\.' >/dev/null \
-        || AC_MSG_ERROR([Ragel is not version 6.x])
-fi
 
 # Discover CPUs for testsuite parallelism, allowing user to override via env var.
 # I'd much rather either:
@@ -410,7 +285,7 @@ AC_MSG_CHECKING([number of CPUs available for testing])
 if test "x$ac_cv_env_TEST_CPUS_set" = "xset"; then
     AC_MSG_RESULT([$TEST_CPUS (user-specified)])
 else
-    # These two methods should work for the *BSDs, MacOS, and Linux
+    # These two methods should work for the *BSDs and Linux
     TEST_CPUS=$(sysctl -n hw.ncpu 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
     AC_MSG_RESULT([$TEST_CPUS])
 fi
@@ -432,8 +307,6 @@ AC_ARG_WITH([testport],[AS_HELP_STRING([--with-testport=N],
 TESTPORT_START=$with_testport
 AC_SUBST([TESTPORT_START])
 
-AC_CHECK_HEADERS([valgrind/memcheck.h])
-
 # Allow specifying an alternate rundir (default $localstatedir/run) for distros
 #   that prefer e.g. /run to /var/run
 rundir_fail="The --with-rundir= option must specify an absolute pathname if used";
@@ -446,28 +319,18 @@ AC_ARG_WITH([rundir],[AS_HELP_STRING([--with-rundir=LOCALSTATEDIR/run],
 ])
 GDNSD_DEFPATH_CONFIG="${sysconfdir}/${PACKAGE_NAME}"
 GDNSD_DEFPATH_STATE="${localstatedir}/lib/${PACKAGE_NAME}"
-GDNSD_DEFPATH_LIB="${libdir}/${PACKAGE_NAME}"
 GDNSD_DEFPATH_LIBEXEC="${libexecdir}/${PACKAGE_NAME}"
 AC_SUBST([GDNSD_DEFPATH_RUN])
 AC_SUBST([GDNSD_DEFPATH_CONFIG])
 AC_SUBST([GDNSD_DEFPATH_STATE])
-AC_SUBST([GDNSD_DEFPATH_LIB])
 AC_SUBST([GDNSD_DEFPATH_LIBEXEC])
-
-# clump up all of the libgdnsd libdeps for re-use in LDADD for
-#   binaries that link libgdnsd on platforms where libtool's
-#   automatic dep resolution is disabled
-LIBGDNSD_LIBS="$MATH_LIB $QSBRLIBS $LIBEV_LIBS $LIBADD_DLOPEN $LIBUNWIND_LIBS"
-AC_SUBST([LIBGDNSD_LIBS])
 
 # BUILD_FEATURES for cmdline output
 B_FEAT="prod"
 if test "x$developer" != xno;    then B_FEAT="dev";             fi
 if test "x$HAS_SENDMMSG" = x1;   then B_FEAT="$B_FEAT mmsg";    fi
-if test "x$USE_INOTIFY" = x1;    then B_FEAT="$B_FEAT inotify"; fi
 if test "x$HAVE_LIBUNWIND" = x1; then B_FEAT="$B_FEAT unwind";  fi
 if test "x$HAVE_GEOIP2" = x1;    then B_FEAT="$B_FEAT geoip2";  fi
-if test "x$GDNSD_B_QSBR" = x1;   then B_FEAT="$B_FEAT urcu";    fi
 AC_DEFINE_UNQUOTED([BUILD_FEATURES], ["$B_FEAT"], [Build Features])
 
 # BUILD_INFO for cmdline output
@@ -477,6 +340,17 @@ if test -d ${srcdir}/${GIT_DIR:-.git} -o -f ${srcdir}/.git; then
 fi
 AC_DEFINE_UNQUOTED([BUILD_INFO],["$B_INFO"],[Build Info])
 
+werror=0
+AC_ARG_WITH([werror],[AS_HELP_STRING([--with-werror],
+    [Turn on -Werror in CFLAGS after other autoconf tests are done])],[
+    if test "x$withval" = xyes; then
+        werror=1
+    fi
+])
+if test $werror = 1; then
+    CFLAGS="${CFLAGS} -Werror"
+fi
+
 # Output generation
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([
@@ -485,7 +359,7 @@ AC_CONFIG_FILES([
   t/libtap/Makefile
   t/libgdmaps/Makefile
 ])
-AC_CONFIG_COMMANDS([mkdirs],[$MKDIR_P sysd; $MKDIR_P docs])
+AC_CONFIG_COMMANDS([mkdirs],[$MKDIR_P init; $MKDIR_P docs])
 AC_OUTPUT
 
 echo "========================================================================"

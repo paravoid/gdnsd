@@ -5,74 +5,88 @@
 # compression targets, etc) changes in order to
 # get better compression.
 #
-# The one case was hand-analyzed to make sure the
-# 814-byte version makes sense.
+# This case was hand-analyzed to make sure it makes sense.
 
 use _GDT ();
 use Test::More tests => 4;
 
+my $_MX = 'foo.compression-torture.foo.Example.com 21600 MX';
+
+# compression targets numbered from zero above each new name, and become 'X'
+# after we run out of our 16 compression target slots, representing missed
+# opportunities to create further compression targets to optimize further names
+# against.  The trailing #N shows which previous target is compressed-against
+# from that point onwards.  The query name is added as 5 targets at the start:
+#           0   1                   2   3       4
+#          "foo.compression-torture.foo.Example.com"
 my $compt_mxset = [
-    'foo.compression-torture.foo.example.com 21600 MX 0 foo.foo.foo.fox.example.com',
-    'foo.compression-torture.foo.example.com 21600 MX 1 fox.example.com',
-    'foo.compression-torture.foo.example.com 21600 MX 2 bar.foo.foo.foo.example.com',
-    'foo.compression-torture.foo.example.com 21600 MX 3 fox.foo.example.com',
-    'foo.compression-torture.foo.example.com 21600 MX 4 foo.fooo.foo.fo.example.com',
-    'foo.compression-torture.foo.example.com 21600 MX 5 foo.fox.example.com',
-    'foo.compression-torture.foo.example.com 21600 MX 6 fox.foo.foo.foo.example.com',
-    'foo.compression-torture.foo.example.com 21600 MX 7 foo.foo.foo.example.com',
-    'foo.compression-torture.foo.example.com 21600 MX 8 foo.fox.foo.foo.example.com',
-    'foo.compression-torture.foo.example.com 21600 MX 9 foo.foo.foo.foo.example.com',
-    'foo.compression-torture.foo.example.com 21600 MX 10 foo.foo.foo.bar.example.com',
-    'foo.compression-torture.foo.example.com 21600 MX 11 foo.foo.example.com',
-    'foo.compression-torture.foo.example.com 21600 MX 12 fo.foo.foo.fooo.example.com',
-    'foo.compression-torture.foo.example.com 21600 MX 13 foo.example.com',
-    'foo.compression-torture.foo.example.com 21600 MX 14 foo.foo.bar.foo.example.com',
-    'foo.compression-torture.foo.example.com 21600 MX 15 fooo.foo.foo.fo.example.com',
-    'foo.compression-torture.foo.example.com 21600 MX 16 foo.fox.foo.example.com',
-    'foo.compression-torture.foo.example.com 21600 MX 17 foo.foo.fooo.fo.example.com',
-    'foo.compression-torture.foo.example.com 21600 MX 18 foo.foo.fox.foo.example.com',
+    #                   5   6   7   8   #3
+    "${_MX} 0           foo.foo.foo.fox.Example.com",
+    #                               #8
+    "${_MX} 1                       fox.Example.com",
+    #                   9   10  11  #2
+    "${_MX} 2           bar.foo.foo.foo.Example.com",
+    #                           12  #2
+    "${_MX} 3                   fox.foo.Example.com",
+    #                   13  14   15  X  #3
+    "${_MX} 4           foo.fooo.foo.fo.Example.com",
+    #                           #7
+    "${_MX} 5                   foo.fox.Example.com",
+    #                   X   #10
+    "${_MX} 6           fox.foo.foo.foo.Example.com",
+    #                       #10
+    "${_MX} 7               foo.foo.foo.Example.com",
+    #                   X   X   #11
+    "${_MX} 8           foo.fox.foo.foo.Example.com",
+    #                   X   #10
+    "${_MX} 9           foo.foo.foo.foo.Example.com",
+    #                   X   X   X   X   #3
+    "${_MX} 10          foo.foo.foo.bar.Example.com",
+    #                           #11
+    "${_MX} 11                  foo.foo.Example.com",
+    #                   X  X   X   X    #3
+    "${_MX} 12          fo.foo.foo.fooo.Example.com",
+    #                               #2
+    "${_MX} 13                      foo.Example.com",
+    #          X    X   X   X   X   X   X       X
+    "${_MX} 14 asdf.xyz.foo.foo.fox.foo.example.org",
+    #                   X   X   X   #2
+    "${_MX} 15          foo.foo.bar.foo.Example.com",
+    #                   X    X   #15
+    "${_MX} 16          fooo.foo.foo.fo.Example.com",
+    #                       X   #12
+    "${_MX} 17              foo.fox.foo.Example.com",
+
+    # These next two names should, in a perfectly-optimal response, compress
+    # more than they do.  However, we ran out of compression target count
+    # before we could record the longer names above they could've matched with
+
+    # Could've been:    X   X   X    #16 (from MX 4 above)
+    # But instead:      X   X   X    X  #3
+    "${_MX} 18          foo.foo.fooo.fo.Example.com",
+    # Could've been:    X   #42 (from MX 17 above)
+    # But instead:      X   X   #12
+    "${_MX} 19          foo.foo.fox.foo.Example.com",
 ];
 
-my $compt_aset = [
-    'foo.foo.foo.fox.example.com 21600 A 192.0.2.178',
-    'fox.example.com 21600 A 192.0.2.161',
-    'bar.foo.foo.foo.example.com 21600 A 192.0.2.169',
-    'fox.foo.example.com 21600 A 192.0.2.163',
-    'foo.fooo.foo.fo.example.com 21600 A 192.0.2.173',
-    'foo.fox.example.com 21600 A 192.0.2.164',
-    'fox.foo.foo.foo.example.com 21600 A 192.0.2.177',
-    'foo.foo.foo.example.com 21600 A 192.0.2.165',
-    'foo.fox.foo.foo.example.com 21600 A 192.0.2.176',
-    'foo.foo.foo.foo.example.com 21600 A 192.0.2.167',
-    'foo.foo.foo.bar.example.com 21600 A 192.0.2.168',
-    'foo.foo.example.com 21600 A 192.0.2.162',
-    'fo.foo.foo.fooo.example.com 21600 A 192.0.2.174',
-    'foo.example.com 21600 A 192.0.2.160',
-    'foo.foo.bar.foo.example.com 21600 A 192.0.2.170',
-    'fooo.foo.foo.fo.example.com 21600 A 192.0.2.171',
-    'foo.fox.foo.example.com 21600 A 192.0.2.166',
-    'foo.foo.fooo.fo.example.com 21600 A 192.0.2.172',
-    'foo.foo.fox.foo.example.com 21600 A 192.0.2.175',
-];
-
-$optrr = Net::DNS::RR->new(
+my $optrr = Net::DNS::RR->new(
     type => "OPT",
-    ednsversion => 0,
+    version => 0,
     name => "",
-    class => 1024,
-    extendedrcode => 0,
-    ednsflags => 0,
+    size => 1024,
+    rcode => 0,
+    flags => 0,
 );
 
 my $pid = _GDT->test_spawn_daemon();
 
 my $size = _GDT->test_dns(
-    resopts => { udppacketsize => 2048 },
-    qname => 'foo.compression-torture.foo.example.com', qtype => 'MX',
+    resopts => { usevc => 0, igntc => 1, udppacketsize => 1024 },
+    qname => 'foo.compression-torture.foo.Example.com', qtype => 'MX',
     answer => $compt_mxset,
-    addtl => [ @$compt_aset, $optrr ],
+    addtl => $optrr,
     stats => [qw/udp_reqs edns udp_edns_big noerror/],
 );
-is($size, 814, "Packet size as expected");
+is($size, 569, "Packet size as expected");
 
 _GDT->test_kill_daemon($pid);

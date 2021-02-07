@@ -1,17 +1,7 @@
 # Valgrind suppression data
-
-# valgrind+glibc DSO+TLS thread issue
-{
-  dso_tls_glibc
-  Memcheck:Leak
-  ...
-  fun:init_rand
-  fun:plugin_weighted_iothread_init
-}
-
-# also, we don't explicitly terminate threads in the normal case,
-#  and valgrind has a bug where it treats creation with the detached
-#  attribute differently from create()->detach()
+# This remaining suppression should only be necessary for plugin_geoip's use of
+# a persistent, detached thread at this point.  Will re-design around that (and
+# other stuff) later...
 {
   pthreads_detached
   Memcheck:Leak
@@ -19,4 +9,21 @@
   fun:_dl_allocate_tls
   ...
   fun:pthread_create*
+}
+
+# This one is tricky.  When the testsuite exercises replacement-spawning, we
+# *do* want valgrind looking at the final new child, thus we must trace through
+# children to the end.  However, there's also the temporary "middle_pid"
+# process to consider.  It's used to orphan the final child and calls _exit(0)
+# fairly quickly.  Because we've already forked, allocations made by the dnsio
+# threads which aren't tracked in static storage that's still accessible to the
+# main thread become "definite" losses, even though we don't care about this
+# case as it has no pragmatic impact.  I tried VALGRIND_DISABLE_ERROR_REPORTING
+# in either the dnsio_udp thread or the middle_pid, but neither of those seem
+# to suppress this either...
+{
+  replace_dnsio_udp
+  Memcheck:Leak
+  ...
+  fun:dnsio_udp_start
 }

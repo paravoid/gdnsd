@@ -22,7 +22,7 @@
 
 #include <gdnsd/compiler.h>
 #include <gdnsd/alloc.h>
-#include <gdnsd/dmn.h>
+#include <gdnsd/log.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -33,58 +33,29 @@
 #include <fcntl.h>
 
 struct gdnsd_fmap_s_ {
-    char* fn;
-    int fd;
     void* buf;
     size_t len;
 };
 
-// We prefer F_OFD_SETLK because it may save us in some strange corner cases
-//   where e.g. a library used by gdnsd or a plugin locks/unlocks the same
-//   pathname that an explicit user of this interface held a lock on, because
-//   with traditional F_SETLK the library's independent lock release will also
-//   release the lock we set here :/
-// However, we're not relying on the distinctions about fork() inheritance, as
-//   no part of gdnsd should be forking while an fmap is open.  Therefore,
-//   regular F_SETLK is acceptable on systems that lack F_OFD_SETLK.
-#ifndef F_OFD_SETLK
-#define F_OFD_SETLK F_SETLK
-#endif
-
-gdnsd_fmap_t* gdnsd_fmap_new(const char* fn, const bool seq) {
-    int fd = open(fn, O_RDONLY | O_CLOEXEC);
-
-    if(fd < 0) {
-        dmn_log_err("Cannot open '%s' for reading: %s", fn, dmn_logf_errno());
+gdnsd_fmap_t* gdnsd_fmap_new(const char* fn, const bool seq, const bool mod)
+{
+    const int fd = open(fn, O_RDONLY | O_CLOEXEC);
+    if (fd < 0) {
+        log_err("Cannot open '%s' for reading: %s", fn, logf_errno());
         return NULL;
     }
 
-    struct flock locker;
-    memset(&locker, 0, sizeof(struct flock));
-    locker.l_type = F_RDLCK;
-    locker.l_whence = SEEK_SET;
-    if(fcntl(fd, F_OFD_SETLK, &locker)) {
-        // try fallback to F_SETLK on EINVAL, in case binary was built with
-        // F_OFD_SETLK support, but runtime kernel doesn't have it.
-        if(errno != EINVAL
-            || (F_OFD_SETLK != F_SETLK && fcntl(fd, F_SETLK, &locker))) {
-                dmn_log_err("Cannot get readlock on '%s': %s", fn, dmn_logf_errno());
-                close(fd);
-                return NULL;
-        }
-    }
-
     struct stat st;
-    if(fstat(fd, &st) < 0) {
-        dmn_log_err("Cannot fstat '%s': %s", fn, dmn_logf_errno());
+    if (fstat(fd, &st) < 0) {
+        log_err("Cannot fstat '%s': %s", fn, logf_errno());
         close(fd);
         return NULL;
     }
 
     // S_ISREG won't fail on symlink here, because this is fstat()
     //   and the earlier open() didn't use O_NOFOLLOW.
-    if(!S_ISREG(st.st_mode) || st.st_size < 0) {
-        dmn_log_err("'%s' is not a regular file", fn);
+    if (!S_ISREG(st.st_mode) || st.st_size < 0) {
+        log_err("'%s' is not a regular file", fn);
         close(fd);
         return NULL;
     }
@@ -92,67 +63,65 @@ gdnsd_fmap_t* gdnsd_fmap_new(const char* fn, const bool seq) {
     const size_t len = (size_t)st.st_size;
     char* mapbuf = NULL;
 
-    if(len) {
-        mapbuf = mmap(NULL, len, PROT_READ, MAP_SHARED, fd, 0);
-        if(mapbuf == MAP_FAILED) {
-            dmn_log_err("Cannot mmap '%s': %s", fn, dmn_logf_errno());
+    if (len) {
+        const int prot = mod ? (PROT_READ | PROT_WRITE) : PROT_READ;
+        const int flags = mod ? MAP_PRIVATE : MAP_SHARED;
+        mapbuf = mmap(NULL, len, prot, flags, fd, 0);
+        if (mapbuf == MAP_FAILED) {
+            log_err("Cannot mmap '%s': %s", fn, logf_errno());
             close(fd);
-            // cppcheck-suppress memleak (MAP_FAILED is not a leak :P)
             return NULL;
         }
-#ifdef HAVE_POSIX_MADVISE
-        if(seq && len > 8192) // why waste the syscall on small files?
-            (void)posix_madvise(mapbuf, len, POSIX_MADV_SEQUENTIAL);
-#endif
-    }
-    else {
+        int advice = POSIX_MADV_WILLNEED;
+        if (seq)
+            advice |= POSIX_MADV_SEQUENTIAL;
+        else
+            advice |= POSIX_MADV_RANDOM;
+        (void)posix_madvise(mapbuf, len, advice);
+    } else {
         // mmap doesn't always work for zero-length files, and we also
         //   don't want callers to have to care about cases where this call
         //   was successful but the buffer pointer is NULL due to len == 0,
         //   so allocate a 1-byte buffer containing a NUL for these cases.
-        close(fd);
-        fd = -1; // signals this mode of operation for fmap_delete()
-        mapbuf = xcalloc(1, 1);
+        mapbuf = xcalloc(1);
     }
 
+    if (close(fd))
+        log_err("Cannot close '%s', continuing anyways: %s", fn, logf_errno());
+
     gdnsd_fmap_t* fmap = xmalloc(sizeof(*fmap));
-    fmap->fn = strdup(fn);
-    fmap->fd = fd;
     fmap->buf = mapbuf;
     fmap->len = len;
 
     return fmap;
 }
 
-const void* gdnsd_fmap_get_buf(const gdnsd_fmap_t* fmap) {
-    dmn_assert(fmap->buf);
+void* gdnsd_fmap_get_buf(const gdnsd_fmap_t* fmap)
+{
+    gdnsd_assert(fmap->buf);
     return fmap->buf;
 }
 
-size_t gdnsd_fmap_get_len(const gdnsd_fmap_t* fmap) {
-    dmn_assert(fmap->buf);
+size_t gdnsd_fmap_get_len(const gdnsd_fmap_t* fmap)
+{
+    gdnsd_assert(fmap->buf);
     return fmap->len;
 }
 
-bool gdnsd_fmap_delete(gdnsd_fmap_t* fmap) {
-    dmn_assert(fmap->buf);
+bool gdnsd_fmap_delete(gdnsd_fmap_t* fmap)
+{
+    gdnsd_assert(fmap->buf);
 
     bool rv = false; // true == error
-    if(fmap->fd >= 0) {
-        dmn_assert(fmap->len);
-        if(munmap(fmap->buf, fmap->len) || close(fmap->fd)) {
-            dmn_log_err("Cannot munmap()/close() '%s': %s",
-                fmap->fn, dmn_logf_errno());
+    if (fmap->len) {
+        if (munmap(fmap->buf, fmap->len)) {
+            log_err("Cannot munmap() %p: %s", fmap->buf, logf_errno());
             rv = true;
         }
-    }
-    else {
-        dmn_assert(!fmap->len);
+    } else {
         free(fmap->buf);
     }
 
-    free(fmap->fn);
     free(fmap);
-
     return rv;
 }

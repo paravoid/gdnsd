@@ -19,8 +19,6 @@
 
 #include <config.h>
 #include <gdnsd/misc.h>
-#include <gdnsd-prot/misc.h>
-#include "misc.h"
 
 #include <gdnsd/alloc.h>
 #include <gdnsd/log.h>
@@ -38,11 +36,11 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <stddef.h>
-#include <dirent.h>
 #include <pthread.h>
 #include <sys/wait.h>
 #include <signal.h>
 #include <math.h>
+#include <sys/resource.h>
 
 #ifdef HAVE_PTHREAD_NP_H
 #  include <pthread_np.h>
@@ -50,7 +48,8 @@
 
 /* misc */
 
-char* gdnsd_str_combine(const char* s1, const char* s2, const char** s2_offs) {
+char* gdnsd_str_combine(const char* s1, const char* s2, const char** s2_offs)
+{
     const unsigned s1_len = strlen(s1);
     const unsigned s2_len = strlen(s2);
     char* out = xmalloc(s1_len + s2_len + 1);
@@ -59,7 +58,7 @@ char* gdnsd_str_combine(const char* s1, const char* s2, const char** s2_offs) {
     work += s1_len;
     memcpy(work, s2, s2_len);
     work[s2_len] = 0;
-    if(s2_offs)
+    if (s2_offs)
         *s2_offs = work;
     return out;
 }
@@ -68,17 +67,19 @@ char* gdnsd_str_combine(const char* s1, const char* s2, const char** s2_offs) {
 //   saving a lot of mundane grunt-code during configuration stuff
 
 typedef struct {
-   const char* ptr;
-   unsigned len;
+    const char* ptr;
+    unsigned len;
 } str_with_len_t;
 
-char* gdnsd_str_combine_n(const unsigned count, ...) {
-    str_with_len_t strs[count];
+char* gdnsd_str_combine_n(const unsigned count, ...)
+{
+    gdnsd_assert(count <= 16);
+    str_with_len_t strs[16];
     unsigned oal = 1; // for terminating NUL
 
     va_list ap;
     va_start(ap, count);
-    for(unsigned i = 0; i < count; i++) {
+    for (unsigned i = 0; i < count; i++) {
         const char* s = va_arg(ap, char*);
         const unsigned l = strlen(s);
         strs[i].ptr = s;
@@ -89,7 +90,7 @@ char* gdnsd_str_combine_n(const unsigned count, ...) {
 
     char* out = xmalloc(oal);
     char* cur = out;
-    for(unsigned i = 0; i < count; i++) {
+    for (unsigned i = 0; i < count; i++) {
         memcpy(cur, strs[i].ptr, strs[i].len);
         cur += strs[i].len;
     }
@@ -98,259 +99,196 @@ char* gdnsd_str_combine_n(const unsigned count, ...) {
     return out;
 }
 
-void gdnsd_thread_setname(const char* n V_UNUSED) {
-    #if defined HAVE_PTHREAD_SETNAME_NP_2
-        pthread_setname_np(pthread_self(), n);
-    #elif defined HAVE_PTHREAD_SET_NAME_NP_2
-        pthread_set_name_np(pthread_self(), n);
-    #elif defined HAVE_PTHREAD_SETNAME_NP_1
-        pthread_setname_np(n);
-    #elif defined HAVE_PTHREAD_SETNAME_NP_3
-        pthread_setname_np(pthread_self(), n, NULL);
-    #endif
-}
+char* gdnsd_str_subst(const char* haystack, const char* needle, const size_t needle_len, const char* repl, const size_t repl_len)
+{
+    gdnsd_assert(needle_len);
+    static const size_t half_size_bits = SIZE_MAX >> (sizeof(size_t) * 8 / 2);
+    const size_t haystack_len = strlen(haystack);
+    if (unlikely(haystack_len >= half_size_bits || needle_len >= half_size_bits || repl_len >= half_size_bits))
+        log_fatal("Oversized inputs during gdnsd_str_subst, backtrace:%s", logf_bt());
 
-static pthread_mutex_t rand_init_lock = PTHREAD_MUTEX_INITIALIZER;
-static gdnsd_rstate64_t rand_init_state = { 0, 0, 0, 0, 0, 0 };
-
-typedef union {
-    uint64_t u64[5];
-    uint32_t u32[10];
-    uint16_t u16[20];
-} urand_data_t;
-
-// Try to get 5x uint64_t from /dev/urandom, ensuring
-//   none of them are all-zeros at the u32 level.
-F_NONNULL
-static bool get_urand_data(urand_data_t* rdata) {
-    int urfd = open("/dev/urandom", O_RDONLY);
-    if(urfd < 0)
-        return false;
-
-    bool rv = false;
-    unsigned attempts = 10;
-    while(!rv && attempts) {
-        memset(rdata, 0, sizeof(*rdata));
-        if(read(urfd, rdata, sizeof(*rdata)) != sizeof(*rdata))
-            break;
-        rv = true;
-        for(unsigned i = 0; i < ARRAY_SIZE(rdata->u32); i++)
-            if(!rdata->u32[i])
-                rv = false;
-        attempts--;
-    };
-
-    close(urfd);
-    return rv;
-}
-
-// We throw away the first N results from new PRNGs.
-// N's range, given current constants below, is [31013 - 96548]
-static const unsigned THROW_MIN = 31013;
-static const unsigned THROW_MASK = 0xFFFF;
-
-// Must be called early, before any consumers of the public PRNG
-//  init interfaces from C<gdnsd/misc.h>
-void gdnsd_rand_meta_init(void) {
-    static bool has_run = false;
-    if(has_run)
-        log_fatal("BUG: gdnsd_rand_meta_init() should only be called once!");
-    else
-        has_run = true;
-
-    urand_data_t rdata;
-    unsigned throw_away;
-
-    if(get_urand_data(&rdata)) {
-        rand_init_state.x = rdata.u64[0];
-        rand_init_state.y = rdata.u64[1];
-        rand_init_state.z1 = rdata.u32[4];
-        rand_init_state.c1 = rdata.u32[5];
-        rand_init_state.z2 = rdata.u32[6];
-        rand_init_state.c2 = rdata.u32[7];
-        throw_away = (
-            rdata.u16[16] ^ rdata.u16[17] ^ rdata.u16[18] ^ rdata.u16[19]
-        );
+    // Readonly pre-count of the needles in the haystack
+    const char* haystack_srch = haystack;
+    const char* ssrv;
+    size_t needle_count = 0;
+    while ((ssrv = strstr(haystack_srch, needle))) {
+        needle_count++;
+        haystack_srch = ssrv + needle_len;
     }
-    else {
-        log_warn("Did not get valid PRNG init via /dev/urandom, using iffy sources");
-        struct timeval t;
-        gettimeofday(&t, NULL);
-        pid_t pidval = getpid();
-        clock_t clockval = clock();
-        rand_init_state.x = 123456789123ULL ^ (uint64_t)t.tv_sec;
-        rand_init_state.y = 987654321987ULL ^ (uint64_t)t.tv_usec;
-        rand_init_state.z1 = 43219876U ^ (uint32_t)clockval;
-        rand_init_state.c1 = 6543217U;
-        rand_init_state.z2 = 21987643U;
-        rand_init_state.c2 = 1732654U ^ (uint32_t)pidval;
-        throw_away = 0;
-    }
-    throw_away &= THROW_MASK;
-    throw_away += THROW_MIN;
-    while(throw_away--)
-        gdnsd_rand64_get(&rand_init_state);
-}
 
-gdnsd_rstate64_t* gdnsd_rand64_init(void) {
-    unsigned throw_away;
-    gdnsd_rstate64_t* newstate = xmalloc(sizeof(*newstate));
+    // The whole string can't be this big, and the needle len has to be non-zero...
+    gdnsd_assert(needle_count < half_size_bits);
 
-    pthread_mutex_lock(&rand_init_lock);
-    newstate->x  = gdnsd_rand64_get(&rand_init_state);
-    do {
-        newstate->y = gdnsd_rand64_get(&rand_init_state);
-    } while(!newstate->y); // y==0 is bad for jlkiss64
-    newstate->z1 = gdnsd_rand64_get(&rand_init_state);
-    newstate->c1 = gdnsd_rand64_get(&rand_init_state);
-    newstate->z2 = gdnsd_rand64_get(&rand_init_state);
-    newstate->c2 = gdnsd_rand64_get(&rand_init_state);
-    throw_away   = gdnsd_rand64_get(&rand_init_state);
-    pthread_mutex_unlock(&rand_init_lock);
+    // Fast-path out if no needles
+    if (!needle_count)
+        return xstrdup(haystack);
 
-    throw_away &= THROW_MASK;
-    throw_away += THROW_MIN;
-    while(throw_away--)
-        gdnsd_rand64_get(newstate);
-    return newstate;
-}
+    // Figure out the final output size
+    const ssize_t adjust = (ssize_t)repl_len - (ssize_t)needle_len;
+    const size_t output_len = (size_t)((ssize_t)haystack_len
+                                       + (adjust * (ssize_t)needle_count));
 
-gdnsd_rstate32_t* gdnsd_rand32_init(void) {
-    unsigned throw_away;
-    gdnsd_rstate32_t* newstate = xmalloc(sizeof(*newstate));
+    // Even with the input size checks at the top, after the math above things
+    // could get crazy in edge cases, so reject them:
+    if (output_len >= half_size_bits)
+        log_fatal("String sizing overflow, backtrace:%s", logf_bt());
 
-    pthread_mutex_lock(&rand_init_lock);
-    newstate->x = gdnsd_rand64_get(&rand_init_state);
-    do {
-        newstate->y = gdnsd_rand64_get(&rand_init_state);
-    } while(!newstate->y); // y==0 is bad for jkisss32
-    newstate->z = gdnsd_rand64_get(&rand_init_state);
-    newstate->w = gdnsd_rand64_get(&rand_init_state);
-    newstate->c = 0;
-    throw_away  = gdnsd_rand64_get(&rand_init_state);
-    pthread_mutex_unlock(&rand_init_lock);
+    // Allocate output
+    const size_t output_alloc = output_len + 1U; // extra byte for NUL
+    char* output = xcalloc(output_alloc);
+    char* outptr = output;
 
-    throw_away &= THROW_MASK;
-    throw_away += THROW_MIN;
-    while(throw_away--)
-        gdnsd_rand32_get(newstate);
-    return newstate;
-}
-
-// fold X.Y.Z to a single uint32_t, same as <linux/version.h>
-F_CONST
-static uint32_t _version_fold(const unsigned x, const unsigned y, const unsigned z) {
-    dmn_assert(x < 65536); dmn_assert(y < 256); dmn_assert(z < 256);
-    return (x << 16) + (y << 8) + z;
-}
-
-bool gdnsd_linux_min_version(const unsigned x, const unsigned y, const unsigned z) {
-    bool rv = false;
-    struct utsname uts;
-    if(!uname(&uts) && !strcmp("Linux", uts.sysname)) {
-        const uint32_t vers_wanted = _version_fold(x, y, z);
-        uint32_t vers_have = _version_fold(0, 0, 0);
-
-        unsigned sys_x, sys_y, sys_z;
-        if(sscanf(uts.release, "%5u.%3u.%3u", &sys_x, &sys_y, &sys_z) == 3) {
-            vers_have = _version_fold(sys_x, sys_y, sys_z);
-        } else if(sscanf(uts.release, "%5u.%3u", &sys_x, &sys_y) == 2) {
-            /* no patch version number, e.g. 3.2 */
-            vers_have = _version_fold(sys_x, sys_y, 0);
+    // Actual search/replace into the output in chunks via memcpy
+    haystack_srch = haystack;
+    while ((ssrv = strstr(haystack_srch, needle))) {
+        gdnsd_assert(ssrv >= haystack_srch);
+        size_t before_bytes = (size_t)(ssrv - haystack_srch);
+        if (before_bytes) {
+            memcpy(outptr, haystack_srch, before_bytes);
+            outptr += before_bytes;
+            haystack_srch += before_bytes;
         }
-
-        if(vers_have >= vers_wanted)
-            rv = true;
+        memcpy(outptr, repl, repl_len);
+        outptr += repl_len;
+        haystack_srch += needle_len;
     }
-    return rv;
+
+    // Handle final literal chunk, if any
+    const char* haystack_nul = &haystack[haystack_len];
+    gdnsd_assert(haystack_srch <= haystack_nul);
+    if (haystack_srch < haystack_nul) {
+        size_t trailing_bytes = (size_t)(haystack_nul - haystack_srch);
+        memcpy(outptr, haystack_srch, trailing_bytes);
+        outptr += trailing_bytes;
+    }
+
+    // Double-check sizing and NUL-termination for sanity
+    gdnsd_assert((outptr - output) == (ssize_t)output_len);
+    gdnsd_assert(output[output_len] == '\0');
+
+    return output;
 }
 
-size_t gdnsd_dirent_bufsize(DIR* d, const char* dirname) {
+void gdnsd_thread_setname(const char* n V_UNUSED)
+{
+#if defined HAVE_PTHREAD_SETNAME_NP_2
+    pthread_setname_np(pthread_self(), n);
+#elif defined HAVE_PTHREAD_SET_NAME_NP_2
+    pthread_set_name_np(pthread_self(), n);
+#elif defined HAVE_PTHREAD_SETNAME_NP_3
+    pthread_setname_np(pthread_self(), n, NULL);
+#endif
+}
+
+void gdnsd_thread_reduce_prio(void)
+{
+#ifdef __linux__
+    // On Linux, [sg]etpriority() can be used to set per-pthread nice values,
+    // and pid zero defaults to threadid rather than the main PID, but this
+    // isn't portable.  I think at least some of the *BSDs may offer similar
+    // functionality through pthread_[sg]etschedparam() for SCHED_OTHER using
+    // the dynamic min/max there with opposite directionality from nice
     errno = 0;
-    long name_max = fpathconf(dirfd(d), _PC_NAME_MAX);
-    if(name_max < 0)
-        log_fatal("fpathconf(%s, _PC_NAME_MAX) failed: %s",
-            dirname, dmn_logf_errno());
-    if(name_max < NAME_MAX)
-        name_max = NAME_MAX;
-    const size_t name_end = offsetof(struct dirent, d_name) + (size_t)name_max + 1U;
-    return name_end > sizeof(struct dirent)
-        ? name_end
-        : sizeof(struct dirent);
+    const int current = getpriority(PRIO_PROCESS, 0);
+    if (errno) {
+        log_err("getpriority() failed: %s", logf_errno());
+    } else if (current < 0) {
+        const int newprio = current / 2;
+        if (setpriority(PRIO_PROCESS, 0, newprio))
+            log_warn("setpriority(%i) failed: %s", newprio, logf_errno());
+    }
+#endif
 }
 
 static pid_t* children = NULL;
 static unsigned n_children = 0;
 
-void gdnsd_register_child_pid(pid_t child) {
-    dmn_assert(child);
-    children = xrealloc(children, sizeof(pid_t) * (n_children + 1));
+void gdnsd_register_child_pid(pid_t child)
+{
+    gdnsd_assert(child);
+    children = xrealloc_n(children, n_children + 1, sizeof(*children));
     children[n_children++] = child;
 }
 
-static unsigned _attempt_reap(unsigned attempts) {
-    unsigned n_children_remain = 0;
-    for(unsigned i = 0; i < n_children; i++)
-        if(children[i])
-            n_children_remain++;
+static unsigned wait_for_children(unsigned attempts)
+{
+    unsigned remaining = n_children;
 
-    while(attempts) {
-        pid_t wprv = waitpid(-1, NULL, WNOHANG);
-        if(wprv < 0) {
-            if(errno == ECHILD)
-                break;
-            else
-                log_fatal("waitpid(-1, NULL, WNOHANG) failed: %s", dmn_logf_errno());
-        }
-        if(wprv) {
-            log_debug("waitpid() reaped %li", (long)wprv);
-            for(unsigned i = 0; i < n_children; i++) {
-                if(children[i] == wprv) {
-                    children[i] = 0;
-                    n_children_remain--;
-                }
-            }
-            if(!n_children_remain)
-                break;
-        }
+    while (remaining && attempts) {
         const struct timespec ms_10 = { 0, 10000000 };
         nanosleep(&ms_10, NULL);
+
+        remaining = 0;
+        for (unsigned i = 0; i < n_children; i++) {
+            if (children[i]) {
+                if (kill(children[i], 0))
+                    remaining++;
+                else
+                    children[i] = 0;
+            }
+        }
         attempts--;
     }
 
-    if(n_children_remain && attempts) { // implies ECHILD
-        log_err("BUG? waitpid() says no children remain, but we expected %u more", n_children_remain);
-        return 0;
-    }
-
-    return n_children_remain;
+    return remaining;
 }
 
-void gdnsd_kill_registered_children(void) {
-    if(!n_children)
+// The main thread's libev loop will auto-reap child processes for us, we just
+// have to wait for the reaps to occur.
+void gdnsd_kill_registered_children(void)
+{
+    if (!n_children)
         return;
 
-    for(unsigned i = 0; i < n_children; i++) {
+    for (unsigned i = 0; i < n_children; i++) {
         log_info("Sending SIGTERM to child process %li", (long)children[i]);
         kill(children[i], SIGTERM);
     }
-    unsigned notdone = _attempt_reap(1000); // 10s
+    unsigned notdone = wait_for_children(1000); // 10s
 
-    if(notdone) {
-        for(unsigned i = 0; i < n_children; i++) {
-            if(children[i]) {
+    if (notdone) {
+        for (unsigned i = 0; i < n_children; i++) {
+            if (children[i]) {
                 log_info("Sending SIGKILL to child process %li", (long)children[i]);
                 kill(children[i], SIGKILL);
             }
         }
-        _attempt_reap(500); // 5s max
+        wait_for_children(500); // 5s max
     }
 }
 
-unsigned gdnsd_uscale_ceil(unsigned v, double s) {
-    dmn_assert(s >= 0.0);
-    dmn_assert(s <= 1.0);
+unsigned gdnsd_uscale_ceil(unsigned v, double s)
+{
+    gdnsd_assert(s >= 0.0);
+    gdnsd_assert(s <= 1.0);
     const double sv = ceil(v * s);
-    dmn_assert(sv <= (double)v);
+    gdnsd_assert(sv <= (double)v);
     return (unsigned)sv;
+}
+
+// Keep updated if we add more signal handlers anywhere, even indirectly!
+void gdnsd_reset_signals_for_exec(void)
+{
+    // reset handlers to default (but not PIPE/HUP, which may be SIG_IGN and we
+    // want to preserve that)
+    struct sigaction defaultme;
+    sigemptyset(&defaultme.sa_mask);
+    defaultme.sa_handler = SIG_DFL;
+    defaultme.sa_flags = 0;
+    if (sigaction(SIGTERM, &defaultme, NULL))
+        log_fatal("sigaction() failed: %s", logf_errno());
+    if (sigaction(SIGINT, &defaultme, NULL))
+        log_fatal("sigaction() failed: %s", logf_errno());
+    if (sigaction(SIGCHLD, &defaultme, NULL))
+        log_fatal("sigaction() failed: %s", logf_errno());
+    if (sigaction(SIGUSR1, &defaultme, NULL))
+        log_fatal("sigaction() failed: %s", logf_errno());
+    if (sigaction(SIGUSR2, &defaultme, NULL))
+        log_fatal("sigaction() failed: %s", logf_errno());
+
+    // unblock all signals
+    sigset_t no_sigs;
+    sigemptyset(&no_sigs);
+    if (pthread_sigmask(SIG_SETMASK, &no_sigs, NULL))
+        log_fatal("pthread_sigmask() failed");
 }

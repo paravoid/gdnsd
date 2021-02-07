@@ -10,6 +10,7 @@
 ns1	A	192.0.2.1
 
 res1	DYNA	geoip!res1
+res1sf	DYNA	geoip!res1sf
 res1na	DYNA	geoip!res1/na
 res1sa	DYNA	geoip!res1/sa
 res1eu	DYNA	geoip!res1/eu
@@ -34,14 +35,6 @@ dmx	MX	0 res1
 dmx	MX	1 res2
 dmx	MX	2 res3
 
-$ADDR_LIMIT_V6 2
-$ADDR_LIMIT_V4 2
-res4	DYNA	geoip!res4
-res4-dync DYNC  geoip!res4
-res44	DYNA	geoip!res44
-res44-dync DYNC  geoip!res44
-$ADDR_LIMIT_V6 100
-$ADDR_LIMIT_V4 100
 res4-lots	DYNA	geoip!res4
 res4-lots-dync	DYNC	geoip!res4
 res44-lots	DYNA	geoip!res44

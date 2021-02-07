@@ -33,112 +33,112 @@
 //  v4-like subspaces in our ntree databases...
 
 F_NONNULL F_PURE
-static bool v6_subnet_of(const uint8_t* check, const unsigned check_mask, const uint8_t* v4, const unsigned v4_mask) {
-    dmn_assert(!(v4_mask & 7)); // all v4_mask are whole byte masks
+static bool v6_subnet_of(const uint8_t* check, const unsigned check_mask, const uint8_t* v4, const unsigned v4_mask)
+{
+    gdnsd_assert(!(v4_mask & 7)); // all v4_mask are whole byte masks
 
     bool rv = false;
 
-    if(check_mask >= v4_mask)
+    if (check_mask >= v4_mask)
         rv = !memcmp(check, v4, (v4_mask >> 3));
 
     return rv;
 }
 
 F_NONNULL F_PURE
-static bool check_v4_issues(const uint8_t* ipv6, const unsigned mask) {
-    dmn_assert(mask < 129);
+static bool check_v4_issues(const uint8_t* ipv6, const unsigned mask)
+{
+    gdnsd_assert(mask < 129);
 
     return (
-          v6_subnet_of(ipv6, mask, start_v4mapped, 96)
-       || v6_subnet_of(ipv6, mask, start_siit, 96)
-       || v6_subnet_of(ipv6, mask, start_wkp, 96)
-       || v6_subnet_of(ipv6, mask, start_teredo, 32)
-       || v6_subnet_of(ipv6, mask, start_6to4, 16)
-    );
+               v6_subnet_of(ipv6, mask, start_v4mapped, 96)
+               || v6_subnet_of(ipv6, mask, start_siit, 96)
+               || v6_subnet_of(ipv6, mask, start_wkp, 96)
+               || v6_subnet_of(ipv6, mask, start_teredo, 32)
+               || v6_subnet_of(ipv6, mask, start_6to4, 16)
+           );
 }
 
 // arguably, with at least some of the v4-like spaces we could simply translate and hope to de-dupe,
 //   if we upgraded nlist_normalize1 to de-dupe matching dclists instead of failing them
 F_NONNULL
-static bool nets_parse(vscf_data_t* nets_cfg, dclists_t* dclists, const char* map_name, nlist_t* nl) {
-    bool rv = false;
-
+static bool nets_parse(const vscf_data_t* nets_cfg, dclists_t* dclists, const char* map_name, nlist_t* nl)
+{
     const unsigned input_nnets = vscf_hash_get_len(nets_cfg);
 
-    for(unsigned i = 0; i < input_nnets; i++) {
+    for (unsigned i = 0; i < input_nnets; i++) {
         // convert 192.0.2.0/24 -> anysin_t w/ mask in port field
         unsigned net_str_len = 0;
         const char* net_str_cfg = vscf_hash_get_key_byindex(nets_cfg, i, &net_str_len);
-        char net_str[net_str_len + 1];
+        if (net_str_len >= GDNSD_ANYSIN_MAXSTR) {
+            log_err("plugin_geoip: map '%s': nets entry '%s' is too long", map_name, net_str_cfg);
+            return true;
+        }
+        char net_str[GDNSD_ANYSIN_MAXSTR];
         memcpy(net_str, net_str_cfg, net_str_len + 1);
 
         char* mask_str = strchr(net_str, '/');
-        if(!mask_str) {
+        if (!mask_str) {
             log_err("plugin_geoip: map '%s': nets entry '%s' does not parse as addr/mask", map_name, net_str);
-            rv = true;
-            break;
+            return true;
         }
         *mask_str++ = '\0';
-        dmn_anysin_t tempsin;
+        gdnsd_anysin_t tempsin;
         int addr_err = gdnsd_anysin_getaddrinfo(net_str, mask_str, &tempsin);
-        if(addr_err) {
+        if (addr_err) {
             log_err("plugin_geoip: map '%s': nets entry '%s/%s' does not parse as addr/mask: %s", map_name, net_str, mask_str, gai_strerror(addr_err));
-            rv = true;
-            break;
+            return true;
         }
 
         unsigned mask;
         uint8_t ipv6[16];
 
         // now store the anysin data into net_t
-        if(tempsin.sa.sa_family == AF_INET6) {
+        if (tempsin.sa.sa_family == AF_INET6) {
             mask = ntohs(tempsin.sin6.sin6_port);
-            if(mask > 128) {
+            if (mask > 128) {
                 log_err("plugin_geoip: map '%s': nets entry '%s/%s': illegal IPv6 mask (>128)", map_name, net_str, mask_str);
-                rv = true;
-                break;
+                return true;
             }
             memcpy(ipv6, tempsin.sin6.sin6_addr.s6_addr, 16);
-            if(check_v4_issues(ipv6, mask)) {
+            if (check_v4_issues(ipv6, mask)) {
                 log_err("plugin_geoip: map '%s': 'nets' entry '%s/%s' covers illegal IPv4-like space, see the documentation for more info", map_name, net_str, mask_str);
-                rv = true;
-                break;
+                return true;
             }
-        }
-        else {
-            dmn_assert(tempsin.sa.sa_family == AF_INET);
-            mask = ntohs(tempsin.sin.sin_port) + 96U;
-            if(mask > 128) {
+        } else {
+            gdnsd_assert(tempsin.sa.sa_family == AF_INET);
+            mask = ntohs(tempsin.sin4.sin_port) + 96U;
+            if (mask > 128) {
                 log_err("plugin_geoip: map '%s': nets entry '%s/%s': illegal IPv4 mask (>32)", map_name, net_str, mask_str);
-                rv = true;
-                break;
+                return true;
             }
             memset(ipv6, 0, 16);
-            memcpy(&ipv6[12], &tempsin.sin.sin_addr.s_addr, 4);
+            memcpy(&ipv6[12], &tempsin.sin4.sin_addr.s_addr, 4);
         }
 
         // get dclist integer from rhs
         vscf_data_t* dc_cfg = vscf_hash_get_data_byindex(nets_cfg, i);
         const uint32_t dclist = dclists_find_or_add_vscf(dclists, dc_cfg, map_name, false);
-        dmn_assert(dclist <= DCLIST_MAX); // auto not allowed here
+        gdnsd_assert(dclist <= DCLIST_MAX); // auto not allowed here
         nlist_append(nl, ipv6, mask, dclist);
     }
 
-    return rv;
+    return false;
 }
 
-nlist_t* nets_make_list(vscf_data_t* nets_cfg, dclists_t* dclists, const char* map_name) {
+nlist_t* nets_make_list(const vscf_data_t* nets_cfg, dclists_t* dclists, const char* map_name)
+{
     nlist_t* nl = nlist_new(map_name, false);
 
-    if(nets_cfg) {
-        dmn_assert(vscf_is_hash(nets_cfg));
-        if(nets_parse(nets_cfg, dclists, map_name, nl)) {
+    if (nets_cfg) {
+        gdnsd_assert(vscf_is_hash(nets_cfg));
+        if (nets_parse(nets_cfg, dclists, map_name, nl)) {
             nlist_destroy(nl);
             nl = NULL;
         }
     }
 
-    if(nl) {
+    if (nl) {
         // This masks out the 5x v4-like spaces that we *never*
         //   lookup directly.  These "NN_UNDEF" dclists will
         //   never be seen by runtime lookups.  The only

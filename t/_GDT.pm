@@ -31,76 +31,17 @@ use POSIX ':sys_wait_h';
 use Scalar::Util qw/looks_like_number/;
 use FindBin ();
 use File::Spec ();
+use Net::DNS 1.03 ();
 use Net::DNS::Resolver ();
-use Net::DNS ();
-use LWP::UserAgent ();
 use Test::More ();
 use File::Copy qw//;
 use Socket qw/AF_INET/;
 use Socket6 qw/AF_INET6 inet_pton/;
 use IO::Socket::INET6 qw//;
 use File::Path qw//;
+use IO::Socket::UNIX qw//;
+use JSON::PP;
 use Config;
-
-# The generic rr-matching code assumes "$rr->string eq $rr->string" is sufficient
-#   to detect a test-failure difference between two RRs.  However, the stock ->string
-#   code in Net::DNS::RR::OPT doesn't actually print the RDATA portion of OPT RRs,
-#   which is where the option code + data live for e.g. edns-client-subnet.  Further,
-#   even with ->string fixed, it was discovered that ->new wasn't actually decoding
-#   the option data properly anyways.  Both are hacked below to make our test comparisons
-#   actually detect failures...
-# Arguably we could just patch our local copy directly instead of hacking methods,
-#   but I'd rather keep our copy of Net::DNS relatively clean for now, pending whatever
-#   comes of all that.
-use Net::DNS::RR::OPT;
-{
-    no warnings 'redefine';
-
-    # The only difference here is removal of the buggy 'unpack("n",...)' from
-    #  the decoding of "optiondata"
-    *Net::DNS::RR::OPT::new = sub {
-	    my ($class, $self, $data, $offset) = @_;
-
-	    $self->{"name"} = "" ;   # should allway be "root"
-	    if ($self->{"rdlength"} > 0) {
-		    $self->{"optioncode"}   = unpack("n", substr($$data, $offset, 2));
-		    $self->{"optionlength"} = unpack("n", substr($$data, $offset+2, 2));
-		    $self->{"optiondata"}   = substr($$data, $offset+4, $self->{"optionlength"});
-	    }
-
-	    $self->{"_rcode_flags"}  = pack("N",$self->{"ttl"});
-
-	    $self->{"extendedrcode"} = unpack("C", substr($self->{"_rcode_flags"}, 0, 1));
-	    $self->{"ednsversion"}   = unpack("C", substr($self->{"_rcode_flags"}, 1, 1));
-	    $self->{"ednsflags"}     = unpack("n", substr($self->{"_rcode_flags"}, 2, 2));
-
-	    return bless $self, $class;
-    };
-
-    # This was changed to actually reflect optioncode/data differences in the string output
-    *Net::DNS::RR::OPT::string = sub {
-        my $self = shift;
-        my $basics =
-            "; EDNS Version "     . $self->{"ednsversion"} .
-            "\t UDP Packetsize: " .  $self->{"class"} .
-            "\n; EDNS-RCODE:\t"   . $self->{"extendedrcode"} .
-            " (" . $Net::DNS::RR::OPT::extendedrcodesbyval{ $self->{"extendedrcode"} }. ")" .
-            "\n; EDNS-FLAGS:\t"   . sprintf("0x%04x", $self->{"ednsflags"}) .
-            "\n";
-        # Technically, there can be multiple options, but the rest of Net::DNS::RR:OPT
-        #  just assumes one and ignores any others, and that's all we really need for now anyways
-        my $optdata = "";
-        if($self->{"optioncode"}) {
-            $optdata =
-                "; EDNS Option Code: " . $self->{"optioncode"} .
-                "\n; EDNS Option Len: " . $self->{"optionlength"} .
-                "\n; EDNS Option Hex Data: " . unpack('H*', $self->{"optiondata"}) .
-                "\n";
-        }
-
-        return $basics . $optdata;
-    };
-}
 
 sub safe_rmtree {
     my $target = shift;
@@ -121,8 +62,9 @@ my %SIGS;
 }
 
 # Set up per-testfile output directory, zones input directory,
-#   and $TEST_SERIAL.
+#   rundir, and $TEST_SERIAL.
 our $OUTDIR;
+our $RUNDIR;
 our $TEST_SERIAL;
 our $ALTZONES_IN = $FindBin::Bin . '/altzones/';
 {
@@ -132,10 +74,28 @@ our $ALTZONES_IN = $FindBin::Bin . '/altzones/';
     $tname =~ s{\.t$}{};
     $OUTDIR = $ENV{TESTOUT_DIR} . '/' . $tname;
 
+    # Hardcoding /tmp/ is a little ugly, but we need rundir pathnames to be
+    # short enough for the stupid limits on unix domain socket pathname
+    # lengths, and in many cases testsuite invocations end up very deep in
+    # directory hierarchies...
+    $RUNDIR = '/tmp/gdnsd-testrun-' . $tname;
+    if(!-d $RUNDIR) {
+        mkdir $RUNDIR or die "Cannot create directory $RUNDIR $!";
+    }
+
     $FindBin::Script =~ m{^0*([0-9]{1,3})}
         or die "Cannot figure out TEST_SERIAL value for $tname";
     $TEST_SERIAL = $1;
 }
+
+# Some TCP testing only works right in the presence of Linux's TCP_DEFER_ACCEPT
+# (which is universally available as far as we care) or *BSD's SO_ACCEPTFILTER
+# accf_dns and/or accf_data (which sometimes can't be loaded for lack of a
+# non-default kernel module).  These flags are set if the daemon seems to emit
+# log messages about the failure to set up either of the SO_ACCEPTFILTER
+# modules so that affected tests can workaround/skip.
+our $ACCF_DNS_FAIL = 0;
+our $ACCF_DATA_FAIL = 0;
 
 # generic flag to eliminate various timer delays under testing
 $ENV{GDNSD_TESTSUITE_NODELAY} = 1;
@@ -149,147 +109,170 @@ our $TESTPORT_START = $ENV{TESTPORT_START};
 die "Test port start specification is not a number"
     unless looks_like_number($TESTPORT_START);
 
-our $DNS_PORT = $TESTPORT_START + (5 * $TEST_SERIAL);
-our $HTTP_PORT = $DNS_PORT + 1;
-our $EXTRA_PORT  = $DNS_PORT + 2;
-our $DNS_SPORT4 = $DNS_PORT + 3;
-our $DNS_SPORT6 = $DNS_PORT + 4;
+our $DNS_PORT = $TESTPORT_START + (2 * $TEST_SERIAL);
+our $EXTRA_PORT = $DNS_PORT + 1;
 
 our $saved_pid;
-
-# If user runs testsuite as root, we try to set the privdrop
-#   user to nobody as a more-reliable choice.  Failing that,
-#   hopefully they read the large warning at the start of
-#   the testsuite output...
-our $PRIVDROP_USER = ($> == 0) ? 'nobody' : '';
 
 # Where to find the gdnsd binary during "installcheck" vs "check"
 our $GDNSD_BIN = $ENV{INSTALLCHECK_SBINDIR}
     ? "$ENV{INSTALLCHECK_SBINDIR}/gdnsd"
     : "$ENV{TOP_BUILDDIR}/src/gdnsd";
 
+# As above for gdnsdctl
+our $GDNSDCTL_BIN = $ENV{INSTALLCHECK_BINDIR}
+    ? "$ENV{INSTALLCHECK_BINDIR}/gdnsdctl"
+    : "$ENV{TOP_BUILDDIR}/src/gdnsdctl";
+
 # extmon_helper works out of the box for "installcheck",
 # but needs some custom paths for "check"
 our $EXTMON_BIN;
 our $EXTMON_HELPER_CFG = '';
 if(!$ENV{INSTALLCHECK_SBINDIR}) { # not installcheck, regular check
-    $EXTMON_BIN = "$ENV{TOP_BUILDDIR}/plugins/gdnsd_extmon_helper";
+    $EXTMON_BIN = "$ENV{TOP_BUILDDIR}/src/plugins/gdnsd_extmon_helper";
     $EXTMON_HELPER_CFG = qq|extmon => { helper_path => "$EXTMON_BIN" }|;
 }
 
-# During installcheck, the default hardcoded plugin path
-#  should work correctly for finding the installed plugins
-our $PLUGIN_PATH;
-if($ENV{INSTALLCHECK_SBINDIR}) {
-    $PLUGIN_PATH = "/xxx_does_not_exist";
-}
-else {
-    $PLUGIN_PATH = "$ENV{TOP_BUILDDIR}/plugins/.libs";
-}
+our $RAND_LOOPS = $ENV{GDNSD_RTEST_LOOPS} || 50;
 
-our $RAND_LOOPS = $ENV{GDNSD_RTEST_LOOPS} || 100;
+# Server control socket
+our $CSOCK_PATH = "$RUNDIR/control.sock";
+our $csock;
 
-my $CSV_TEMPLATE = 
-    "uptime\r\n"
-    . "([0-9]+)\r\n"
-    . "noerror,refused,nxdomain,notimp,badvers,formerr,dropped,v6,edns,edns_clientsub\r\n"
-    . "([0-9]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+)\r\n"
-    . "udp_reqs,udp_recvfail,udp_sendfail,udp_tc,udp_edns_big,udp_edns_tc\r\n"
-    . "([0-9]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+)\r\n"
-    . "tcp_reqs,tcp_recvfail,tcp_sendfail\r\n"
-    . "([0-9]+),([0-9]+),([0-9]+)\r\n";
+# Cached resolver objects from Net::DNS
+our $_resolver;
+our $_resolver6;
 
 my %stats_accum = (
-    noerror      => 0,
-    refused      => 0,
-    nxdomain     => 0,
-    notimp       => 0,
-    badvers      => 0,
-    formerr      => 0,
-    dropped      => 0,
-    v6           => 0,
-    edns         => 0,
-    edns_clientsub => 0,
-    udp_reqs     => 0,
-    udp_sendfail => 0,
-    udp_recvfail => 0,
-    udp_tc       => 0,
-    udp_edns_big => 0,
-    udp_edns_tc  => 0,
-    tcp_reqs     => 0,
-    tcp_recvfail => 0,
-    tcp_sendfail => 0,
+    noerror          => 0,
+    refused          => 0,
+    nxdomain         => 0,
+    notimp           => 0,
+    badvers          => 0,
+    formerr          => 0,
+    dropped          => 0,
+    v6               => 0,
+    edns             => 0,
+    edns_clientsub   => 0,
+    edns_do          => 0,
+    udp_reqs         => 0,
+    udp_sendfail     => 0,
+    udp_recvfail     => 0,
+    udp_tc           => 0,
+    udp_edns_big     => 0,
+    udp_edns_tc      => 0,
+    tcp_reqs         => 0,
+    tcp_recvfail     => 0,
+    tcp_sendfail     => 0,
+    tcp_conns        => 0,
+    tcp_close_c      => 0,
+    tcp_close_s_ok   => 0,
+    tcp_close_s_err  => 0,
+    tcp_close_s_kill => 0,
+    _tcp_conns_prev  => 0,
 );
 
-my $_useragent;
-sub _get_daemon_csv_stats {
-    $_useragent ||= LWP::UserAgent->new(
-        protocols_allowed => ['http'],
-        requests_redirectable => [],
-        max_size => 10240,
-        timeout => 3,
-    );
-    my $response = $_useragent->get("http://127.0.0.1:${HTTP_PORT}/csv");
-    if(!$response) {
-        return "No response...";
+# reset stats, constrolsock, and resolver objects (incl TCP conns)
+# if daemon run multiple times in one testfile
+sub reset_for_new_daemon {
+    foreach my $k (keys %stats_accum) { $stats_accum{$k} = 0; }
+    if ($csock) {
+        $csock = IO::Socket::UNIX->new($CSOCK_PATH)
+            or die "hard-fail: cannot open runtime control socket $CSOCK_PATH: $!";
     }
-    elsif($response->code != 200) {
-        return "Response code was not 200. Response dump:\n" . $response->as_string("\n");
+    undef $_resolver;
+    undef $_resolver6;
+}
+
+# As above, but do not reset stats for "replace", since they should carry
+# through, but we do have to fixup tcp_conns -> tcp_close, since the carried
+# stats will reflect the final shutdown close of connections in the old.  Note
+# that in order to transit multiple replacements in a single test run, we must
+# track the hidden stat _tcp_conns_prev to see how many should be newly-closed
+# after each replace operation:
+sub reset_for_replace_daemon {
+    if ($stats_accum{'tcp_conns'}) {
+        my $new_conns = $stats_accum{'tcp_conns'} - $stats_accum{'_tcp_conns_prev'};
+        $stats_accum{'tcp_close_s_ok'} += $new_conns;
+        $stats_accum{'_tcp_conns_prev'} = $stats_accum{'tcp_conns'};
     }
-    return $response->content;
+    if ($csock) {
+        $csock = IO::Socket::UNIX->new($CSOCK_PATH)
+            or die "hard-fail: cannot open runtime control socket $CSOCK_PATH: $!";
+    }
+    undef $_resolver;
+    undef $_resolver6;
+}
+
+sub _get_daemon_json_stats {
+    my $req = "S\0\0\0\0\0\0\0";
+    if(8 == syswrite($csock, $req, 8)) {
+        my $resp;
+        if(8 == sysread($csock, $resp, 8)) {
+            if(substr($resp, 0, 1) eq "A") {
+                my $resplen = unpack('L', substr($resp, 4, 4));
+                my $whole_resp = '';
+                my $done = 0;
+                while($done < $resplen) {
+                    my $buf;
+                    my $bytes = sysread($csock, $buf, $resplen - $done);
+                    die "Cannot get daemon stats!" if $bytes < 1;
+                    $done += $bytes;
+                    $whole_resp .= $buf;
+                }
+                return decode_json($whole_resp);
+            }
+        }
+    }
+    die "Cannot get daemon stats!";
+}
+
+sub daemon_reload_zones {
+    if(8 == syswrite($csock, "Z\0\0\0\0\0\0\0", 8)) {
+        my $resp;
+        if(8 == sysread($csock, $resp, 8)) {
+            return if(substr($resp, 0, 1) eq "A");
+        }
+    }
+    die "Zones reload operation failed";
 }
 
 sub check_stats_inner {
     my ($class, %to_check) = @_;
-    my $content = _get_daemon_csv_stats();
-    if($content !~ m/^${CSV_TEMPLATE}/s) {
-       die "Content does not match CSV_TEMPLATE, content is: " . $content;
-    }
-    my $csv_vals = {
-        uptime          => $1,
-        noerror         => $2,
-        refused         => $3,
-        nxdomain        => $4,
-        notimp          => $5,
-        badvers         => $6,
-        formerr         => $7,
-        dropped         => $8,
-        v6              => $9,
-        edns            => $10,
-        edns_clientsub  => $11,
-        udp_reqs        => $12,
-        udp_recvfail    => $13,
-        udp_sendfail    => $14,
-        udp_tc          => $15,
-        udp_edns_big    => $16,
-        udp_edns_tc     => $17,
-        tcp_reqs        => $18,
-        tcp_recvfail    => $19,
-        tcp_sendfail    => $20,
-    };
 
-    ## use Data::Dumper; warn Dumper($csv_vals);
+    my $json = _get_daemon_json_stats();
+    # For hysterical raisins, we flatten the structure and use prefixes here...
+    my %json_vals = %{$json->{'stats'}};
+    @json_vals{ map { "udp_" . $_; } keys %{$json->{'udp'}} } = values %{$json->{'udp'}};
+    @json_vals{ map { "tcp_" . $_; } keys %{$json->{'tcp'}} } = values %{$json->{'tcp'}};
+
+    ## use Data::Dumper; warn Dumper(\%json_vals);
 
     foreach my $checkit (keys %to_check) {
-        if($csv_vals->{$checkit} != $to_check{$checkit}) {
-            my $ftype = ($csv_vals->{$checkit} < $to_check{$checkit}) ? 'soft' : 'hard';
-            die "$checkit mismatch (${ftype}-fail), wanted " . $to_check{$checkit} . ", got " . $csv_vals->{$checkit};
+        next if $checkit =~ /^_/;
+        if($json_vals{$checkit} != $to_check{$checkit}) {
+            my $ftype = ($json_vals{$checkit} < $to_check{$checkit}) ? 'soft' : 'hard';
+            die "$checkit mismatch (${ftype}-fail), wanted " . $to_check{$checkit} . ", got " . $json_vals{$checkit};
         }
     }
 
-    return;
+    if (defined $to_check{'_code'}) {
+        $to_check{'_code'}->(\%json_vals);
+    }
+
+    return \%json_vals;
 }
 
 sub check_stats {
     my ($class, %to_check) = @_;
-    my $total_attempts = $TEST_RUNNER ? 30 : 10;
-    my $attempt_delay = $TEST_RUNNER ? 0.5 : 0.1;
+    my $total_attempts = $TEST_RUNNER ? 30 : 100;
+    my $attempt_delay = $TEST_RUNNER ? 0.5 : 0.01;
     my $err;
     my $attempts = 0;
     while(1) {
-        eval { $class->check_stats_inner(%to_check) };
+        my $json_vals = eval { $class->check_stats_inner(%to_check) };
         $err = $@;
-        return unless $err;
+        return $json_vals unless $err;
         if($err !~ /hard-fail/ && $attempts++ < $total_attempts) {
             select(undef, undef, undef, $attempt_delay * $attempts);
         }
@@ -308,42 +291,22 @@ sub proc_tmpl {
         or die "Cannot open test template output '$outpath' for writing: $!";
 
     my $dns_lspec = qq{[ 127.0.0.1, ::1 ]};
-
-    my $http_lspec = qq{[ 127.0.0.1, ::1 ]};
+    my $state_dir = qq{$OUTDIR/var/lib/gdnsd};
 
     my $std_opts = qq{
         listen => $dns_lspec
-        http_listen => $http_lspec
         dns_port => $DNS_PORT
-        http_port => $HTTP_PORT
-        plugin_search_path = $PLUGIN_PATH
-        run_dir = $OUTDIR/run/gdnsd
-        state_dir = $OUTDIR/var/lib/gdnsd
-        realtime_stats = true
-        zones_rfc1035_quiesce = 1.02
+        run_dir = $RUNDIR
+        state_dir = $state_dir
     };
-
-    if($ENV{USE_ZONES_AUTO}) {
-        $std_opts .= qq{        zones_rfc1035_auto = true\n};
-    }
-    else {
-        $std_opts .= qq{        zones_rfc1035_auto = false\n};
-    }
-
-    if($PRIVDROP_USER) {
-        $std_opts .= qq{username = $PRIVDROP_USER\n};
-    }
 
     while(<$in_fh>) {
         s/\@std_testsuite_options\@/$std_opts/g;
         s/\@extra_port\@/$EXTRA_PORT/g;
-        # if the test uses the extmon helper from source dir, pre-execute it
-        #   now to do libtool stuff before privdrop, in case of testsuite
-        #   running as root.  Otherwise on first execution libtool tries to
-        #   write to the builddir as as the privdrop user.
-        if(s/\@extmon_helper_cfg\@/$EXTMON_HELPER_CFG/g && $PRIVDROP_USER && $EXTMON_BIN) {
-            system("$EXTMON_BIN >/dev/null 2>&1");
-        }
+        s/\@dns_port\@/$DNS_PORT/g;
+        s/\@run_dir\@/$RUNDIR/g;
+        s/\@state_dir\@/$state_dir/g;
+        s/\@extmon_helper_cfg\@/$EXTMON_HELPER_CFG/g;
         print $out_fh $_;
     }
 
@@ -382,7 +345,6 @@ sub recursive_templated_copy {
 }
 
 our $GDOUT_FH; # open fh on gdnsd.out for test_log_output()
-our $INOTIFY_ENABLED = 0;
 
 sub daemon_abort {
     my $log_fn = shift;
@@ -395,7 +357,7 @@ sub daemon_abort {
 }
 
 sub spawn_daemon_setup {
-    my ($class, $etcsrc, $geoip_data) = @_;
+    my ($class, $etcsrc) = @_;
 
     $etcsrc ||= "etc";
 
@@ -405,20 +367,13 @@ sub spawn_daemon_setup {
         mkdir $d or die "Cannot create directory $d: $!";
     }
 
-    if($geoip_data) {
-        require _FakeGeoIP;
-        my $gdir = "$OUTDIR/etc/geoip";
-        mkdir $gdir or die "Cannot create directory $gdir: $!";
-        _FakeGeoIP::make_fake_geoip($gdir . "/FakeGeoIP.dat", $geoip_data);
-    }
-
     recursive_templated_copy("${FindBin::Bin}/${etcsrc}", "${OUTDIR}/etc");
 }
 
 sub spawn_daemon_execute {
     my $exec_line = $TEST_RUNNER
-        ? qq{$TEST_RUNNER $GDNSD_BIN -Dxfc $OUTDIR/etc start}
-        : qq{$GDNSD_BIN -Dxfc $OUTDIR/etc start};
+        ? qq{$TEST_RUNNER $GDNSD_BIN -Dc $OUTDIR/etc start}
+        : qq{$GDNSD_BIN -Dc $OUTDIR/etc start};
 
     my $daemon_out = $OUTDIR . '/gdnsd.out';
 
@@ -448,10 +403,10 @@ sub spawn_daemon_execute {
         if(-f $daemon_out) {
             open($GDOUT_FH, '<', $daemon_out)
                 or die "Cannot open '$daemon_out' for reading: $!";
-            my $is_listening;
             while(<$GDOUT_FH>) {
-                $INOTIFY_ENABLED = 1 if /\brfc1035: will use inotify for zone change detection$/;
                 daemon_abort($daemon_out) if /\bfatal: /; # don't wait around if we see a fatal log entry...
+                $ACCF_DNS_FAIL = 1 if m{Failed to install 'dnsready' SO_ACCEPTFILTER};
+                $ACCF_DATA_FAIL = 1 if m{Failed to install 'dataready' SO_ACCEPTFILTER};
                 return $pid if /\bDNS listeners started$/;
             }
             close($GDOUT_FH)
@@ -466,13 +421,15 @@ sub spawn_daemon_execute {
 sub test_spawn_daemon {
     my $class = shift;
 
-    # reset stats if daemon run multiple times in one testfile
-    foreach my $k (keys %stats_accum) { $stats_accum{$k} = 0; }
+    reset_for_new_daemon();
 
     local $Test::Builder::Level = $Test::Builder::Level + 1;
     my $pid = eval{
         $class->spawn_daemon_setup(@_);
-        $class->spawn_daemon_execute();
+        my $p = $class->spawn_daemon_execute();
+        $csock = IO::Socket::UNIX->new($CSOCK_PATH)
+            or die "hard-fail: cannot open runtime control socket $CSOCK_PATH: $!";
+        $p;
     };
     unless(Test::More::ok(!$@ && $pid)) {
         Test::More::diag("Cannot spawn daemon: $@");
@@ -498,12 +455,14 @@ sub test_spawn_daemon_setup {
 sub test_spawn_daemon_execute {
     my $class = shift;
 
-    # reset stats if daemon run multiple times in one testfile
-    foreach my $k (keys %stats_accum) { $stats_accum{$k} = 0; }
+    reset_for_new_daemon();
 
     local $Test::Builder::Level = $Test::Builder::Level + 1;
     my $pid = eval{
-        $class->spawn_daemon_execute();
+        my $p = $class->spawn_daemon_execute();
+        $csock = IO::Socket::UNIX->new($CSOCK_PATH)
+            or die "hard-fail: cannot open runtime control socket $CSOCK_PATH: $!";
+        $p;
     };
     unless(Test::More::ok(!$@ && $pid)) {
         Test::More::diag("Cannot spawn daemon: $@");
@@ -513,14 +472,57 @@ sub test_spawn_daemon_execute {
     return $pid;
 }
 
-##### START RELOAD STUFF
+sub test_run_gdnsdctl {
+    my $class = shift;
+    my $args = shift;
+    my $fail = shift || 0;
+    my $ctl_out = $OUTDIR . '/gdnsdctl.out';
+    my $exec_line = $TEST_RUNNER
+        ? qq{$TEST_RUNNER $GDNSDCTL_BIN -t 300 -Dc $OUTDIR/etc $args}
+        : qq{$GDNSDCTL_BIN -t 17 -Dc $OUTDIR/etc $args};
 
-sub send_sigusr1_unless_inotify {
-    if(!$INOTIFY_ENABLED) {
-        kill('SIGUSR1', $saved_pid)
-            or die "Cannot send SIGUSR1 to gdnsd at pid $saved_pid";
+    # Because gdnsdctl could intentionally cause a daemon to exit and then wait
+    # on it to fully dissappear, we must install an auto-reaper for the daemon
+    # itself while testing a gdnsdctl command.
+    local $SIG{CHLD} = sub {
+        local ($!, $?);
+        waitpid($saved_pid, WNOHANG);
+    };
+
+    my $gpid = fork();
+    die "Fork failed!" if !defined $gpid;
+
+    if(!$gpid) { # child, exec daemon
+        open(STDOUT, '>', $ctl_out)
+            or die "Cannot open '$ctl_out' for writing as STDOUT: $!";
+        open(STDIN, '<', '/dev/null')
+            or die "Cannot open /dev/null for reading as STDIN: $!";
+        open(STDERR, '>&STDOUT')
+            or die "Cannot dup STDOUT to STDERR: $!";
+        exec($exec_line);
+    }
+
+    waitpid($gpid, 0);
+
+    if($fail) {
+        if($?) {
+            Test::More::ok(1);
+            Test::More::diag("gdnsdctl status was $?");
+        } else {
+            Test::More::ok(0);
+            die "gdnsdctl status was unexpectedly zero!";
+        }
+    } else {
+        if($?) {
+            Test::More::ok(0);
+            Test::More::diag("gdnsdctl status was $?");
+            die "gdnsdctl status was $?";
+        }
+        Test::More::ok(1);
     }
 }
+
+##### START RELOAD STUFF
 
 sub test_log_output {
     my ($class, $texts_in) = @_;
@@ -533,15 +535,27 @@ sub test_log_output {
 
     my $ok = 0;
     # $retry_delay doubles after each wait...
-    my $retry_delay = 0.1;
-    my $retry = $TEST_RUNNER ? 10 : 9;
+    my $retry_delay = 0.01;
+    my $retry = $TEST_RUNNER ? 12 : 10;
+
+    # Note that tailing a file like this can sometimes read partial lines, if
+    # the OS happens to flush a buffer to visibility mid-line (as can happen
+    # commonly at disk-block boundaries) and our read picks that up terminated
+    # by EOF before the rest of the line becomes visible.  This is the reason
+    # for the $partial/$line code and \n-checking .
+    my $partial = '';
     while($retry--) {
         while(scalar(keys %$texts) && ($_ = <$GDOUT_FH>)) {
-            foreach my $k (keys %$texts) {
-                my $this_text = $texts->{$k};
-                if($_ =~ /\Q$this_text\E/) {
-                    delete $texts->{$k};
-                    last;
+            $partial .= $_;
+            if($partial =~ /\n$/) {
+                my $line = $partial;
+                $partial = '';
+                foreach my $k (keys %$texts) {
+                    my $this_text = $texts->{$k};
+                    if($line =~ /\Q$this_text\E/) {
+                        delete $texts->{$k};
+                        last;
+                    }
                 }
             }
         }
@@ -553,7 +567,7 @@ sub test_log_output {
     }
 
     # do a final delay under valgrind, because technically it's often
-    #   the case that we still have a prcu swap to do after the log
+    #   the case that we still have a rcu swap to do after the log
     #   message is emitted, before test results are reliable...
     if($TEST_RUNNER) {
         select(undef, undef, undef, $retry_delay);
@@ -601,15 +615,11 @@ sub write_statefile {
 
 ##### END RELOAD STUFF
 
-my $_resolver;
-my $_resolver6;
-
 sub get_resolver {
     return $_resolver ||= Net::DNS::Resolver->new(
         recurse => 0,
         nameservers => [ '127.0.0.1' ],
         port => $DNS_PORT,
-        srcport => $DNS_SPORT4,
         srcaddr => '127.0.0.1',
         force_v4 => 1,
         persistent_tcp => 1,
@@ -626,7 +636,6 @@ sub get_resolver6 {
         recurse => 0,
         nameservers => [ '::1' ],
         port => $DNS_PORT,
-        srcport => $DNS_SPORT6,
         srcaddr => '::1',
         force_v6 => 1,
         persistent_tcp => 1,
@@ -642,7 +651,7 @@ sub get_resolver6 {
 #  to compare with the real server response for correctness.
 #  Args are: { headerparam => value }, $question, [ answers ], [ auths ], [ addtl ]
 #  headers bits default to AA and QR on, the rest off, rcode NOERROR, opcode QUERY,
-#  note this wont set ID properly, which is almost surely necessary, and should
+#  note this won't set ID properly, which is almost surely necessary, and should
 #  match the question being asked.
 sub mkanswer {
     my ($class, $headers, $question, $answers, $auths, $addtl) = @_;
@@ -665,7 +674,6 @@ sub mkanswer {
     $p->header->ad(0);
     $p->header->opcode('QUERY');
     $p->header->rcode('NOERROR');
-    $p->header->qdcount(0) if !$question;
 
     # Apply nondefault header settings from $headers
     foreach my $hfield (keys %$headers) {
@@ -786,6 +794,9 @@ sub _compare_sections {
 # Defers to _compare_rrsets_wrr below if the rrset in question has
 #  a matching entry in $wrr_v4 or $wrr_v6
 
+our $_lastacookie;
+sub get_last_server_cookie { return $_lastacookie; }
+
 sub _compare_rrsets {
     my ($a_rrset, $c_rrset, $limit_v4, $limit_v6, $wrr_v4, $wrr_v6) = @_;
 
@@ -796,13 +807,27 @@ sub _compare_rrsets {
     if($rrtype eq 'A') {
         $wrr = $wrr_v4->{$dname} if exists $wrr_v4->{$dname};
         $limit = $limit_v4;
-    }
-    elsif($rrtype eq 'AAAA') {
+    } elsif($rrtype eq 'AAAA') {
         $wrr = $wrr_v6->{$dname} if exists $wrr_v6->{$dname};
         $limit = $limit_v6;
-    }
-    elsif($rrtype eq 'CNAME') {
+    } elsif($rrtype eq 'CNAME') {
         $limit = 1;
+    } elsif($rrtype eq 'OPT') {
+        $_lastacookie = undef;
+        my $ccookieval = $c_rrset->[0]->option('COOKIE');
+        if (defined $ccookieval) {
+            my $ccookielen = length($ccookieval);
+            my $acookieval = $a_rrset->[0]->option('COOKIE');
+            if (defined $acookieval) {
+                my $acookielen = length($acookieval);
+                return "Bad server cookie len ($acookielen != $ccookielen)" if ($acookielen != $ccookielen);
+                $_lastacookie = $acookieval;
+                if ($acookielen > 8) {
+                    substr($acookieval, 8, $acookielen - 8, "\x00" x ($acookielen - 8));
+                    $a_rrset->[0]->option(COOKIE => $acookieval);
+                }
+            }
+        }
     }
 
     # Clamp unspecified/excessive limit to @$c_rrset
@@ -969,7 +994,6 @@ sub query_server {
         my $sock = $sockclass->new(
             PeerAddr => $ns,
             PeerPort => $port,
-            LocalPort => ($transport eq 'IPv6') ? $DNS_SPORT6 : $DNS_SPORT4,
             ReuseAddr => 1,
             Proto => 'udp',
             Timeout => 10,
@@ -1004,7 +1028,16 @@ sub query_server {
 
         # restore altered resolver options
         foreach my $k (keys %saveopts) {
-           $res->$k($saveopts{$k});
+           # Bug introduced in Net::DNS 1.11 makes resetting udppacketsize to
+           # 512 not work correctly (it keeps sending EDNS with new queries @
+           # 512).   Setting it to 511 worked up until version 1.23, when this
+           # broke again, and now we're setting to zero in this case, which
+           # seems to work at least from 1.03 to 1.26 (latest at this time).
+           if ($k eq "udppacketsize" && $saveopts{$k} == 512) {
+               $res->udppacketsize(0);
+           } else {
+               $res->$k($saveopts{$k});
+           }
         }
     }
 
@@ -1037,22 +1070,22 @@ sub test_dns {
         else {
             $aref = $args{$sec};
         }
-        map { if(!ref $aref->[$_]) { $aref->[$_] = Net::DNS::RR->new_from_string($aref->[$_]) } } (0..$#$aref);
+        map { if(!ref $aref->[$_]) { $aref->[$_] = Net::DNS::RR->new($aref->[$_]) } } (0..$#$aref);
     }
 
-    my $question = $args{qpacket} || Net::DNS::Packet->new($args{qname}, $args{qtype});
+    my $qpacket = $args{qpacket} || Net::DNS::Packet->new($args{qname}, $args{qtype});
     if(defined $args{qid}) {
-        $question->header->id($args{qid});
+        $qpacket->header->id($args{qid});
     }
     if(defined $args{q_optrr}) {
-        $question->push(additional => $args{q_optrr});
+        $qpacket->push(additional => $args{q_optrr});
     }
 
     my $answer = $args{nores}
         ? undef
         : $class->mkanswer(
             $args{header},
-            $args{noresq} ? undef : $question->question(),
+            $args{noresq} ? undef : ($qpacket->question())[0],
             $args{answer},
             $args{auth},
             $args{addtl},
@@ -1065,7 +1098,7 @@ sub test_dns {
             foreach my $stat (@{$args{stats}}) {
                 $stats_accum{$stat}++;
             }
-            $size4 = eval { $class->query_server($args{qpacket_raw}, $question, $answer, 'IPv4', $args{resopts}, $args{limit_v4}, $args{limit_v6}, $args{wrr_v4}, $args{wrr_v6}) };
+            $size4 = eval { $class->query_server($args{qpacket_raw}, $qpacket, $answer, 'IPv4', $args{resopts}, $args{limit_v4}, $args{limit_v6}, $args{wrr_v4}, $args{wrr_v6}) };
             if($@) {
                 Test::More::ok(0);
                 Test::More::diag("IPv4 query failed: $@");
@@ -1082,7 +1115,7 @@ sub test_dns {
                     $stats_accum{v6}++;
                 }
             }
-            $size6 = eval { $class->query_server($args{qpacket_raw}, $question, $answer, 'IPv6', $args{resopts}, $args{limit_v4}, $args{limit_v6}, $args{wrr_v4}, $args{wrr_v6}) };
+            $size6 = eval { $class->query_server($args{qpacket_raw}, $qpacket, $answer, 'IPv6', $args{resopts}, $args{limit_v4}, $args{limit_v6}, $args{wrr_v4}, $args{wrr_v6}) };
             if($@) {
                 Test::More::ok(0);
                 Test::More::diag("IPv6 query failed: $@");
@@ -1106,7 +1139,7 @@ sub test_stats {
 
 sub stats_inc { shift; $stats_accum{$_}++ foreach (@_); }
 
-sub test_kill_daemon {
+sub test_kill_other_daemon {
     my ($class, $pid) = @_;
     local $Test::Builder::Level = $Test::Builder::Level + 1;
 
@@ -1157,36 +1190,107 @@ sub test_kill_daemon {
     Test::More::ok(1);
 }
 
+sub test_kill_daemon {
+    my ($class, $pid) = @_;
+    local $Test::Builder::Level = $Test::Builder::Level + 1;
+
+    # undef our cached resolvers, so that they'll close any open TCP
+    # connections to the server and not make it wait around on shutdown.
+    undef $_resolver;
+    undef $_resolver6;
+
+    # use synchronous controlsock stop
+    my $req = "X\0\0\0\0\0\0\0";
+    my $resp;
+    if(syswrite($csock, $req, 8) != 8) {
+        my $d = "Failed to write stop request to control socket";
+        Test::More::ok(0);
+        Test::More::diag($d);
+        die $d;
+    }
+    if(sysread($csock, $resp, 8) != 8 || $resp ne "A\0\0\0\0\0\0\0") {
+        my $d = "Failed to read ACK from control socket when stopping";
+        Test::More::ok(0);
+        Test::More::diag($d);
+        die $d;
+    }
+    if(sysread($csock, $resp, 1) != 0) {
+        my $d = "Failed to read conn-close condition on control socket when stopping";
+        Test::More::ok(0);
+        Test::More::diag($d);
+        die $d;
+    }
+
+    # reap gdnsd and validate exitcode of zero.
+    if(!$pid) {
+        my $d = "Test Bug: no gdnsd pid specified?";
+        Test::More::ok(0);
+        Test::More::diag($d);
+        die $d;
+    }
+    eval {
+        local $SIG{ALRM} = sub { die "gdnsd waitpid timeout"; };
+        alarm($TEST_RUNNER ? 60 : 30);
+        waitpid($pid, 0);
+    };
+    if($@) {
+        my $d = "Daemon at pid $pid failed to exit in reasonable time after stop";
+        Test::More::ok(0);
+        Test::More::diag($d);
+        die $d;
+    }
+    if(!WIFEXITED(${^CHILD_ERROR_NATIVE})) {
+        my $d = "gdnsd exited strangely... CHILD_ERROR_NATIVE is " . ${^CHILD_ERROR_NATIVE};
+        Test::More::ok(0);
+        Test::More::diag($d);
+        die $d;
+    }
+    my $ev = WEXITSTATUS(${^CHILD_ERROR_NATIVE});
+    if($ev) {
+        my $d = "Daemon exit value was $ev";
+        Test::More::ok(0);
+        Test::More::diag($d);
+        die $d;
+    }
+    undef $saved_pid; # avoid END-block SIGKILL if we know it died fine
+    undef $csock;
+
+    # if we make it here, gdnsd exited with status zero as expected.
+    Test::More::ok(1);
+    return;
+}
+
 my $EDNS_CLIENTSUB_OPTCODE = 0x0008;
 sub optrr_clientsub {
     my %args = @_;
     $args{scope_mask} ||= 0;
 
-    my %option;
+    my $optrr = Net::DNS::RR->new(
+        type => "OPT",
+        version => 0,
+        name => "",
+        size => 1024,
+        rcode => 0,
+        flags => 0,
+    );
 
     if(defined $args{addr_v4} || defined $args{addr_v6}) {
         my $src_mask = $args{src_mask};
         my $addr_bytes = ($src_mask >> 3) + (($src_mask & 7) ? 1 : 0);
         if(defined $args{addr_v4}) {
-            $option{optiondata} = pack('nCCa' . $addr_bytes, 1, $args{src_mask}, $args{scope_mask}, inet_pton(AF_INET, $args{addr_v4}));
-            $option{optioncode} = $EDNS_CLIENTSUB_OPTCODE;
+            $optrr->option('CLIENT-SUBNET' => pack('nCCa' . $addr_bytes, 1, $args{src_mask}, $args{scope_mask}, inet_pton(AF_INET, $args{addr_v4})));
         }
         else {
-            $option{optiondata} = pack('nCCa' . $addr_bytes, 2, $args{src_mask}, $args{scope_mask}, inet_pton(AF_INET6, $args{addr_v6}));
-            $option{optioncode} = $EDNS_CLIENTSUB_OPTCODE;
+            $optrr->option('CLIENT-SUBNET' => pack('nCCa' . $addr_bytes, 2, $args{src_mask}, $args{scope_mask}, inet_pton(AF_INET6, $args{addr_v6})));
         }
     }
 
-    Net::DNS::RR->new(
-        type => "OPT",
-        ednsversion => 0,
-        name => "",
-        class => 1024,
-        extendedrcode => 0,
-        ednsflags => 0,
-        %option,
-    );
+    $optrr;
 }
 
-END { kill('SIGKILL', $saved_pid) if $saved_pid; }
+END {
+    kill('SIGKILL', $saved_pid) if $saved_pid;
+    safe_rmtree($RUNDIR);
+}
+
 1;

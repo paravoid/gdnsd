@@ -1,17 +1,14 @@
 # Random packet torture testing.
-# All of these queries should result
-# in "dropped", "fmterr", etc...
-# They are sent directly via UDP rather than Net::DNS,
-# so specific error counts aren't reliable.  We just check
-# at the end that the overall packet count in the daemon
-# stats is correct, and that the "valid" counts (noerror,
-# nxdomain, refused) only account for the handful of
-# valid requests we make to ensure the daemon is still alive
-# and well.
+# All of these queries should result in "dropped", "fmterr", etc...
+# They are sent directly via UDP rather than Net::DNS, so specific error counts
+# aren't reliable.  We just check at the end that the overall packet count in
+# the daemon stats is correct, and that the "valid" counts (noerror) only
+# account for the handful of valid requests we make to ensure the daemon is
+# still alive and well.
 
 use _GDT ();
 use Scalar::Util ();
-use Test::More tests => 4 + ($_GDT::RAND_LOOPS * 5);
+use Test::More tests => 4 + $_GDT::RAND_LOOPS;
 
 # Initialize the random seed and diag() it, so that
 #  failures can be reproduced and sorted out
@@ -44,8 +41,15 @@ sub gen_random_packet {
 }
 
 sub gen_valid_header {
-    my $req_packet = Net::DNS::Packet->new('foo.example.com', 'A');
-    return $req_packet->header->encode;
+    return pack("nCCnnnn",
+        12345, # id
+        0, # flags1
+        0, # flags2
+        1, # qdcount
+        0, # ancount
+        0, # nscount
+        0  # arcount
+    );
 }
 
 sub gen_random_packet_good_header {
@@ -89,17 +93,6 @@ foreach (1..$_GDT::RAND_LOOPS) {
     send($sock, gen_random_packet(13), 0);
     send($sock, gen_random_packet(14), 0);
     send($sock, gen_random_packet(15), 0);
-
-    $rand_reqs += 15;
-
-    eval {_GDT->check_stats(
-        udp_reqs => $rand_reqs + $valid_reqs,
-        noerror => $valid_reqs,
-        nxdomain => 0,
-        refused => 0,
-    )};
-    ok(!$@) or diag $@;
-
     send($sock, gen_random_packet(), 0);
     send($sock, gen_random_packet(), 0);
     send($sock, gen_random_packet(), 0);
@@ -120,17 +113,6 @@ foreach (1..$_GDT::RAND_LOOPS) {
     send($sock, gen_random_packet(), 0);
     send($sock, gen_random_packet(), 0);
     send($sock, gen_random_packet(), 0);
-
-    $rand_reqs += 20;
-
-    eval {_GDT->check_stats(
-        udp_reqs => $rand_reqs + $valid_reqs,
-        noerror => $valid_reqs,
-        nxdomain => 0,
-        refused => 0,
-    )};
-    ok(!$@) or diag $@;
-
     send($sock, gen_random_packet(), 0);
     send($sock, gen_random_packet(), 0);
     send($sock, gen_random_packet(), 0);
@@ -151,17 +133,6 @@ foreach (1..$_GDT::RAND_LOOPS) {
     send($sock, gen_random_packet_good_header(10), 0);
     send($sock, gen_random_packet_good_header(11), 0);
     send($sock, gen_random_packet_good_header(), 0);
-
-    $rand_reqs += 20;
-
-    eval {_GDT->check_stats(
-        udp_reqs => $rand_reqs + $valid_reqs,
-        noerror => $valid_reqs,
-        nxdomain => 0,
-        refused => 0,
-    )};
-    ok(!$@) or diag $@;
-
     send($sock, gen_random_packet_good_header(), 0);
     send($sock, gen_random_packet_good_header(), 0);
     send($sock, gen_random_packet_good_header(), 0);
@@ -181,15 +152,7 @@ foreach (1..$_GDT::RAND_LOOPS) {
     send($sock, gen_random_packet_good_header(), 0);
     close($sock);
 
-    $rand_reqs += 17;
-
-    eval {_GDT->check_stats(
-        udp_reqs => $rand_reqs + $valid_reqs,
-        noerror => $valid_reqs,
-        nxdomain => 0,
-        refused => 0,
-    )};
-    ok(!$@) or diag $@;
+    $rand_reqs += 72;
 
     eval {_GDT->query_server(
         undef,
@@ -203,14 +166,10 @@ foreach (1..$_GDT::RAND_LOOPS) {
     ok(!$@) or diag $@;
 
     $valid_reqs += 1;
-
 }
 
 eval {_GDT->check_stats(
     udp_reqs => $rand_reqs + $valid_reqs,
-    noerror => $valid_reqs,
-    nxdomain => 0,
-    refused => 0,
 )};
 ok(!$@) or diag $@;
 

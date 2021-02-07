@@ -9,35 +9,39 @@ If your starting point is a tarball, the following prerequisites apply:
 * A basically functional POSIX build environment with a C99 compiler
 * libev headers and libraries, version 4.x: distro pkg
   or http://software.schmorp.de/pkg/libev.html
-* Ragel 6.x: http://www.complang.org/ragel/ (or distro package)
 * Perl 5.10.1 or higher and the perl "pod2man" command for document
   generation (this may be in the package perl-podlaters)
+* liburcu aka userspace-rcu headers and libraries. Use distro pkg or
+  http://lttng.org/urcu/
+* libsodium-1.x cryptography library, should be avail for most platforms!
 
 The following are recommended but optional:
 
-* liburcu aka userspace-rcu headers and libraries. Use distro pkg or
-  http://lttng.org/urcu/ (important for performance!)
-* libmaxminddb headers and libraries to enable MaxMind GeoIP2 database
-  support: https://github.com/maxmind/libmaxminddb/releases
-  Preferably version 1.2.0 or higher!
+* libmaxminddb v1.2.0 or higher headers and libraries to enable MaxMind
+  GeoIP2 database support:
+  https://github.com/maxmind/libmaxminddb/releases
 * libunwind headers and libraries. (for stacktrace on some fatals)
 
 The following have no real effect on the build or runtime, but are
 required in order to run the testsuite:
 
-* Perl modules: JSON::PP, LWP 5.805+, Socket6, IO::Socket::INET6, HTTP::Daemon
+* Perl modules: JSON::PP, Socket6, IO::Socket::INET6, HTTP::Daemon,
+  and Net::DNS 1.03 or higher.
   (JSON::PP comes with Perl v5.13.9 and higher)
 
 If working directly from a git clone:
 
-* autoconf (2.63+), automake(1.11.1+), and libtool(2.2.6+) packages
+* autoconf (2.64+) and automake(1.13+) packages
 * If you want "make check" to run optional GeoIP-related unit tests which use
   large compressed files, those are stored in a separate repo as a submodule.
   You can bring them into your tree via: "git submodule update --init".
   You will also need the 'xz' compression utility installed to unpack them.
 * Start with "autoreconf -vif", then ./configure ...
+* You'll need Ragel 6.x ( http://www.complang.org/ragel/ ) if you want to
+  be able to edit and recompile the .rl parser source code for the
+  configuration and zonefile languages.
 
-Interesting / Non-standard autoconf options
+Interesting / Non-standard autoconf/make options
 ===========================================
 
 --with-rundir=/some/where
@@ -57,9 +61,6 @@ Interesting / Non-standard autoconf options
     systemd software installed (but e.g. are not using it for the init
     system), use --without-systemdsystemunitdir
 
---without-urcu
-  Explicitly disable support for liburcu (falls back to pthread rwlocks)
-
 --without-hardening
   Disable the default compiler/linker flags for security hardening.
   Probably not a great idea unless they're breaking things on your
@@ -73,6 +74,28 @@ Interesting / Non-standard autoconf options
     down evasive bugs.  If you just want debug symbols, put -g in CFLAGS.
 
 --with-testport=N
-  The test suite needs to be able to bind to ~300 consecutive ports on
+  The test suite needs to be able to bind to ~200 consecutive ports on
     127.0.0.1 and ::1, starting with port N.  The default is 12345.  If this
     conflicts with some existing service on your machine, change it here.
+
+TEST_CPUS=N
+  If this env var is set before configure, it will determine testsuite
+    execution parallelism.  Regular build parallelism is controlled by the
+    standard "-j" flag to make, but testsuite parallelism is a little different
+    and can't easily be unified with -j.  Some parts of the testsuite use this
+    value directly, and others which do lots of sleeping/stalling multiply the
+    value by 4.  The default is to attempt the auto-detect the number of
+    CPUs on the machine configure is executing on via "sysctl -n hw.ncpu" (for
+    BSDs) or "getconf _NPROCESSORS_ONLN" (for Linux).
+
+SLOW_TESTS=1
+  If this env var is set to "1" at the time "make check" is executed, a few
+    additional tests will be run which can take a long time (due to necessary
+    waits on timeouts while not doing much) to execute, but exercise the
+    code more thoroughly.  While it's set in our standard QA scripting, it can
+    be annoying if you're running "make check" a lot during development and
+    testing.  For reference, as of this writing on my laptop, a regular "make
+    check" takes ~3 seconds to execute, while "SLOW_TESTS=1 make check" takes
+    ~22 seconds.  Currently only some of the TCP DNS protocol handling code
+    benefits from the additional slow tests, so it's of little value for
+    commits that don't touch TCP.

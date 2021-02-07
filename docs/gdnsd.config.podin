@@ -5,9 +5,7 @@ gdnsd.config - gdnsd configuration file
 =head1 SYNOPSIS
 
   options => {
-    log_stats => 86400
     tcp_timeout => 15 ; zonefile-style comment
-    include_optional_ns => true
     listen => [ 127.0.0.1, 192.0.2.1 ]
   }
 
@@ -54,33 +52,6 @@ These options control the overall behavior of L<gdnsd(8)>.
 
 =over 4
 
-=item B<username>
-
-String, defaults to "gdnsd".  This is the username the daemon drops
-privileges to the uid/gid of on startup if started as root.
-
-=item B<weaker_security>
-
-Boolean, default false.  When false, the daemon may take additional
-privilege-preventing measures beyond the basic drop of the uid/gid of the
-process.  These may be platform specific and evolve over time, and may impose
-limits that break some users' configurations in corner cases.
-
-This option exists as an escape hatch to get things working again, but the
-name of the option is intended to pressure you to find another way to
-accomplish your goal without requiring reduced security.
-
-At this time, the only security feature this controls is setting the
-Linux-specific C<prctl()> flag C<PR_SET_NO_NEW_PRIVS> on kernels 3.5 and
-higher.  When this is set, it immutably prevents the process and all
-descendants from ever gaining new privileges again.  This is done regardless
-of whether the daemon initially started as root and voluntarily dropped its
-own privileges or was started as a regular user.
-
-Note that C<PR_SET_NO_NEW_PRIVS> could break plugin_extmon configurations
-which execute binaries that need escalated privileges via set[ug]id bits
-and/or capabilities bits.  A classic example of such a binary is C<ping>.
-
 =item B<zones_default_ttl>
 
 Integer seconds, default 86400.  This is the global default
@@ -101,7 +72,7 @@ good reasons to raise this value in practice.
 
 =item B<min_ttl>
 
-Integer seconds, default 5, range 1 - 86400 (1 day).
+Integer seconds, default 5, range 0 - 86400 (1 day).
 This is the global minimum TTL.  Any TTL found in a zone which
 is below this value will be clamped to this value with a warning,
 including the minimum TTLs of DYN[AC] records and SOA ncache TTLs.
@@ -118,12 +89,6 @@ must be greater than or equal to min_ttl.
 
 Integer port, 1-65535, default 53.  This is the global default port
 number for DNS listener addresses which do not specify port numbers
-themselves.
-
-=item B<http_port>
-
-Integer port, 1-65535, default 3506.  This is the default HTTP port
-number for stats listener addresses which do not specify port numbers
 themselves.
 
 =item B<listen>
@@ -155,7 +120,7 @@ It can also take the form of an array of such addresses, as in:
       192.0.2.1,
       192.0.2.2,
       2001:DB8::1,
-      "[2001:DB8::1234]:5353",
+      "[2001:DB8::1234]:53035",
     ]
   }
 
@@ -165,9 +130,9 @@ per-address options, as in:
   options => {
     listen => {
       192.0.2.1 => {
-        tcp_timeout = 7
+        tcp_timeout = 15
       },
-      192.0.2.2:5353 => {
+      192.0.2.2:53035 => {
         udp_threads = 5
       },
     }
@@ -175,7 +140,7 @@ per-address options, as in:
 
 The per-address options (which are identical to, and locally override,
 the global option of the same name) are C<tcp_threads>,
-C<tcp_timeout>, C<tcp_clients_per_thread>, C<udp_threads>, C<udp_recv_width>,
+C<tcp_timeout>, C<tcp_clients_per_thread>, C<tcp_fastopen>, C<udp_threads>,
 C<udp_rcvbuf>, and C<udp_sndbuf>.
 
 Finally, it can also be set to the special string value C<any>, as in:
@@ -189,29 +154,13 @@ sockets should correctly handle sending outgoing datagrams via the interface
 they were received on with a source address matching the destination address of
 the request.
 
-=item B<http_listen>
-
-Basically like B<listen> above, but used for the HTTP listener (serving
-stats information), and defaulting to port 3506.  The hash form isn't
-supported as there are no per-address options, and the any/all options
-don't exist here.  The default is to listen on the IPv4 and IPv6
-any-addresses (C<0.0.0.0> and C<::>).
-
-It makes common sense to restrict access to this service via firewall
-rules, as the data served leaks information about the rate and nature
-of your DNS traffic.  This is mostly intended for your own internal
-monitoring purposes.
-
 =item B<tcp_threads>
 
-Integer, default 1, min 0, max 1024.  This is the number of separate
+Integer, default 2, min 1, max 1024.  This is the number of separate
 TCP listening sockets and corresponding listener threads that will be created
 for each DNS listener address.  On a multi-core host, increasing this
-parameter (up to at most a small multiple of the CPU core count) may
-increase overall performance.  Note that on hosts without SO_REUSEPORT
-support (notably Linux < 3.9, Solaris), any setting greater than 1 will
-be forced to 1 with a warning, as support multiple sockets/threads
-per-address are not supported without SO_REUSEPORT.
+parameter (up to at most a very small multiple of the CPU core count) may
+increase overall performance.
 
 =item B<udp_threads>
 
@@ -219,68 +168,220 @@ Exactly like C<tcp_threads>, but for UDP sockets per DNS listening address.
 
 =item B<tcp_clients_per_thread>
 
-Integer, default 128, min 1, max 65535.  This is maximum number of tcp
-DNS connections gdnsd will allow to occur in parallel per listening tcp
-thread.  Once this limit is reached by a given thread, no new
-connections will be allowed to that thread until one of the existing
-ones closes or times out.  Note that sockets map 1:m to threads, and thus
-the total client limit for connecting to a given socket address would be
-C<tcp_clients_per_thread * tcp_threads>.
+Integer, default 256, min 16, max 65535.  This is maximum number of tcp DNS
+connections gdnsd will allow to occur in parallel per listening tcp thread.
+When this limit is reached by a new incoming connection, the longest-idle of
+the existing connections will be closed immediately in exchange for it.
+
+You can monitor the C<tcp.close_s_kill> stat to see if such closes are
+happening due to reaching the limit, which should be avoided if possible.  The
+code is designed to be resilient (at least answer one legitimate request per
+legitimate connection) even in the face of misbehaving (e.g. slow-read/write)
+connection overloads on Linux, and on BSDs with C<SO_ACCEPTFILTER> and the
+appropriate kernel modules (C<accf_dataready> and/or C<accf_dns>) loaded (there
+will be a non-fatal error log output on startup if they aren't).
+
+Note that socket addresses map 1:m to threads (that is, each thread gets a
+separate C<SO_REUSEPORT> instantiation of a given logical socket), and thus the
+total client limit for connecting to a given socket address would be
+C<tcp_clients_per_thread * tcp_threads>, but it's up to the operating system to
+balance connections, and it may use simple connection tuple hashing or simple
+round-robin, neither of which may guarantee very even distribution.
 
 =item B<tcp_timeout>
 
-Integer seconds, default 5, min 3, max 60.  TCP DNS connections will be
-forcibly shut down if they go idle without receiving and responding to
-a valid query for this many seconds.  L<gdnsd(8)> allows multiple
-requests per connection, and this idle timeout applies to the time
-between requests as well.
+Integer seconds, default 37, min 5, max 1800.
 
-=item B<udp_recv_width>
+This determines the client-side idle timeout for TCP connections, which
+is sent by the server to applicable clients supporting signalling mechanisms
+like RFC 7828 EDNS TCP Keepalive or RFC 8490 DNS Stateful Operations (DSO).
 
-Integer, default 8, min 1, max 64.  On supported Linux kernels this
-setting tunes the use of more efficient interfaces to receive and send
-multiple packets with a single syscall.  Higher values reduce syscall
-overhead and generally give the server higher throughput and better
-efficiency under high loads.
+There is a corresponding server-side timeout which determines when gdnsd will
+give up on a client it believes to be delinquent (one that keeps a connection
+open too long without honoring any signalled client-side idle timeout).  The
+server-side timeout is double the client timeout (which equates to a default of
+74, min 10, max 3600).
 
-I believe that this is basically always a win under load when
-supported, but values much larger than necessary do have a chance to
-increase average response latency very slightly.  The optimal setting
-is highly dependent on local hardware, software configuration, and
-network load conditions.
+Note that in the common/typical case of well-behaved clients and connections,
+on a Linux server (where we use TCP_DEFER_ACCEPT) or a BSD server supporting
+the "dnsready" or "dataready" accept filters, when a new connection arrives we
+immediately receive the first request and fire back the response without any
+opportunity for delays that count as idle time, without re-entering the general
+eventloop where idle time is processed or other new connections could arrive.
 
-Setting this to a value of 1 will completely disable this code, as if
-we were running on a platform that didn't support it.  On platforms
-that don't support it, this option has no effect and is ignored.  On
-Linux if we don't detect a 3.0 or higher kernel at runtime, we fall
-back to the same code as other platforms that don't support it.
+The idleness of a client is only reset after it completes each full transaction
+(send us a full request, and our full response makes it into at least the local
+write buffer).  Inability to immediately write a full response into the
+server's local TCP buffers (generally because the client has a too-small
+receive window and/or is not ACKing several previous replies) causes immediate
+connection termination.  Well-behaved client connections which don't stall out
+midway through a transaction only become idle connections (subject to
+termination for idleness) during inter-transaction idle periods after their
+first transaction, and for not-so-well-behaved clients the idle timer helps
+control the impact of patterns similar to slow-read/write attacks.
+
+The server will send edns TCP keepalive information to clients with all
+responses where it is legal (request used EDNS over TCP, and DSO is not yet
+established).  The timeout value will be sent with the fixed value that is
+configured here until the server begins shutting down, at which point the zero
+value is sent in such responses in an attempt to get clients to cleanly close.
+
+Clients which establish DSO via the Keepalive TLV will get the same client-side
+timeout sent to them as the DSO Inactivity timeout, with the DSO KeepAlive
+interval set to Infinite (this means we don't request the client to ever send
+artificial keepalive pings, and our client-side timeout applies to the interval
+between real DNS request transactions in the session).  DSO clients will also
+get better and more-timely information when the server is shutting down or
+being replaced (we can push immediate DSO unidirectional messages towards them
+asking that they close their session gracefully).
+
+=item B<disable_tcp_dso>
+
+Boolean, default false.  This disables RFC 8490 DNS Stateful Operations (DSO)
+support for TCP threads.
+
+Probably the only good reasons to disable would be finding interop issues or
+misbehaviors in this new code and/or standard, as otherwise it offers a
+superior mechanism for managing stateful client connections versus the previous
+best available solution (RFC 7828 EDNS TCP Keepalive).
+
+=item B<tcp_backlog>
+
+Integer, min 0, default 0, max 65535.  This sets the C<backlog> argument of the
+C<listen()> call for TCP listening sockets.  The exact effects of this varies
+by OS implementation, and it can also interact with features like
+C<TCP_DEFER_ACCEPT> and C<SO_ACCEPTFILTER>.  If left at (or set to) the default
+value of zero, the compile-time constant C<SOMAXCONN> from the operating system
+will be used, which tends to be reasonable for most use-cases.
+
+=item B<tcp_fastopen>
+
+Integer, default 256, min 0, max 1048576.  If set to a non-zero value, declares
+a TCP Fastopen queue size and enables the feature.  TCP Fastopen allows clients
+who have connected to the server at least once before to send initial data (in
+our case, their first DNS request) at the same time as their initial SYN,
+shaving off the round trip delays of the handshake on reconnect.  This is
+recommended, but may require OS-level support and/or configuration tuning, and
+in the case of multiple servers behind a loadbalancer or anycast pool, may also
+require administrative coordination of the server-side secret TFO key.
+
+=item B<tcp_proxy>
+
+Boolean, default false.  This TCP option is B<only> supported inside the
+per-address options of a specific listener address in the hash form of the
+C<listen> option, not as a global option.
+
+Addresses for which the option is enabled B<only> accept PROXY requests, cannot
+use port number 53, do not spawn corresponding UDP listeners, and do not accept
+UDP-related options.  We support both version 1 and 2 of the PROXY protocol as
+defined in L<https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt>, and
+only accept TCPv4, TCPv6, and PROXYv2's "LOCAL".
+
+The source IP passed to gdnsd over the PROXY protocol will be used as the
+connection source address for all logical purposes, including e.g. GeoIP lookup
+fallbacks in the absence of edns-client-subnet.  Once the initial PROXY header
+is parsed successfully, the connection is treated exactly as any other TCP
+connection for the remainder of its life.
+
+It is not recommended to expose PROXY listeners to public traffic; they should
+be confined to localhost or to addresses which are not reachable outside of
+your infrastructure due to firewalling, etc.  This option is primarily intended
+to test encrypted transports using external daemons proxying into gdnsd.  If
+using it for some other generic loadbalancing without crypto, padding should be
+disabled via C<tcp_pad> below.
+
+PROXY connections increment all of the same stat counters as regular TCP
+connections, and also add two new proxy-specific ones:
+
+    tcp.proxy: count of received connections on PROXY listeners (also
+               increments the normal tcp.conns stat).
+    tcp.proxy_fail: count of received PROXY connections which are
+                    closed early for failing to send a PROXY header
+                    the server parses and likes (also increments
+                    tcp.close_s_err)
+
+Example listen config:
+
+      options => {
+        listen => {
+          0.0.0.0 => { ... } # normal UDP+TCP on port 53
+          :: => { ... } # normal UDP+TCP on port 53 for IPv6
+          127.0.0.1:53035 => { tcp_proxy => true, ... }
+        }
+      }
+
+=item B<tcp_pad>
+
+Boolean, default false for normal TCP listeners, default true for C<tcp_proxy>
+listeners (see above).  This TCP option is B<only> supported inside the
+per-address options of a specific listener address in the hash form of the
+C<listen> option, not as a global option.
+
+If enabled (by default for the C<tcp_proxy> case), a response to any request
+which carries an EDNS OPT RR will be padded using the EDNS Padding option to a
+multiple of 468 bytes as recommended in RFC 8467.  This should only be enabled
+if the TCP connections to a listener are encrypted by a proxy, which is the
+intended use-case for C<tcp_proxy> above.  You may wish to enable this manually
+if proxying encrypted requests via a daemon that doesn't do the PROXY protocol,
+and you may wish to disable it on C<tcp_proxy> listeners if the other daemon
+isn't providing a crypto wrapper.
 
 =item B<udp_rcvbuf>
 
-Integer, min 4096, max 1048576.  If set, this value will be used to set
-the C<SO_RCVBUF> socket option on the UDP listening socket(s).  Most
-users do not need to tune this value.  If left unset, the code
-takes a somewhat heuristic approach, trying to raise the value only if
-the OS-supplied default seems too low, and multiplying it a bit in the
-case of C<udp_recv_width> > 1.
+Integer, min 4096, max 1048576, default 0.  If set to a non-zero value, this
+value will be used to set the C<SO_RCVBUF> socket option on the UDP listening
+socket(s), otherwise we leave the OS defaults alone.
 
 =item B<udp_sndbuf>
 
-Integer, min 4096, max 1048576.  If set, this value will be used to set
-the C<SO_SNDBUF> socket option on the UDP listening socket(s).  Tuning
-advice mirrors the above.
+Integer, min 4096, max 1048576, default 0.  If set to a non-zero value, this
+value will be used to set the C<SO_SNDBUF> socket option on the UDP listening
+socket(s), otherwise we leave the OS defaults alone.
 
-=item B<max_http_clients>
+=item B<tcp_control>
 
-Integer, default 128, min 1, max 65535.  Maximum number of HTTP
-connections to allow in parallel at any given time.  Once this number
-is reached, no more new connections will be answered until an existing
-connection closes or times out.
+B<DANGER> - Exposing the control socket over TCP is dangerous.  The control
+socket server code is not designed to be robust against arbitrary attack
+traffic, and does not have any authentication or encryption.  Listen addresses
+defined here should be well-protected and confined by network firewall policies
+to internal, privileged clients, and should B<definitely> not be exposed on the
+public Internet.
 
-=item B<http_timeout>
+This specifies one or more secondary TCP listen addresses for control socket
+connections (alongside the required primary UNIX domain socket), which must be
+explicitly configured if desired.  It is similar to B<listen> above in that it
+accepts either a single address spec, an array of address specs, or a hash
+whose keys are address specs and whose values are address-specific options.
+All address specs must include an explicit address and non-zero port number.
 
-Integer seconds, default 5, min 3, max 60.  HTTP connections will be
-forcibly shut down if they go idle for more than this many seconds.
+The only two address-specific options are C<chal_ok> and C<ctl_ok>, which are
+booleans defaulting to false.  By default, a TCP control socket is restricted
+to read-only operations (C<gdnsdctl status>, C<gdnsdctl stats>, and
+C<gdnsdctl states>).  C<chal_ok> allows ACME Challenge operations on the socket
+(C<gdnsdctl acme-dns-01> and C<gdnsdctl acme-dns-01-flush>).  C<ctl_ok> allows
+daemon control commands on the socket (C<gdnsdctl reload-zones> and C<gdnsdctl
+replace>).  The C<gdnsdctl stop> command isn't allowed over TCP at all.
+
+The standard unix control socket is also used for some inter-daemon
+coordination and resource handoff during replacements, which cannot be
+supported over the TCP variant.
+
+Examples:
+
+    options => { tcp_control => 127.0.0.1:885 } # read-only ops only
+
+    options => { tcp_control => [ 127.0.0.1:885, 127.0.0.2:885 ] } # ditto
+
+    options => { tcp_control => {
+        127.0.0.1:885 => {} # readonly
+        127.0.0.1:886 => { chal_ok => true } # allows challenge stuff
+        127.0.0.1:887 => { ctl_ok => true } # allows daemon control
+        127.0.0.1:888 => { chal_ok => true, ctl_ok => true } # allows both
+    }}
+
+The C<gdnsdctl> client has an option C<-s> for specifying a TCP socket to
+connect to for use with C<tcp_control> sockets, in which case it does not even
+attempt to parse the server configuration to find the normal unix socket path.
 
 =item B<zones_strict_data>
 
@@ -292,99 +393,31 @@ loaded and served.
 
 If this is set to true, such warnings will be upgraded and treated
 the same as the more-serious class of zone data errors which prevent
-successful loading of zone data.  The consequences of this are variable:
-on initial startup or checkconf, this results in a failed zonefile, which
-may either be ignored or abort execution, depending on C<zones_strict_startup>
-below.  During a runtime zone data reload, any existing good copy of the zone
-would continue to be served until the error is corrected in the source.
+successful loading of zone data.
 
-=item B<zones_strict_startup>
+=item B<zones_rfc1035_threads>
 
-Boolean, default C<true>
+Integer, default 2, min 1, max 1024.  When the standard RFC1035 zone files are
+(re-)loaded, up to this many ephemeral threads will be spawned in parallel to
+help load and parse them faster.
 
-If true (the default), on daemon startup (via C<start> or C<restart>)
-if any zone fails to load correctly, the daemon will
-abort.  If false, the daemon will simply ignore the failed zone and
-continue operations.
+The way the work is divided among the threads is relatively naive: As the zones
+directory on the filesystem is scanned for zone filenames, the names are
+divided evenly into N separate work lists (one per thread), and then the
+threads are all spawned and work on their own fixed lists in parallel, with the
+final splicing of the zone data into the root tree happening serially in the
+main zones thread as each worker thread finishes.  In the case that the total
+count of zonefiles is less than the configured thread count, the excess threads
+are not spawned.
 
-Runtime reloads via SIGUSR1 and/or periodic/inotify scanning always
-treat bad zone data non-fatally (leaving any existing good copy intact
-in memory for lookups).
+This simple strategy tends to work well for large counts of zonefiles where the
+per-zonefile parsing costs are roughly even, but in cases where a minority of
+zonefiles take much longer to parse than others, it will not always result in a
+very "fair" outcome (some threads may run much longer than others).
 
-This also affects the C<checkconf> action.  It will only fail in terms
-of exit value on bad zonefiles if this is true (although it will note
-any failures to stderr regardless).
-
-=item B<zones_rfc1035_auto>
-
-Boolean, default C<true>.
-
-If auto is enabled (the default), the daemon will detect changes to zone data
-automatically at runtime and apply them as they appear.  In the general case
-this is done by periodically scanning C<lstat()> data on the contents of the
-zones directory and looking for metadata changes since last check.
-
-On modern Linux systems, the daemon may also use C<inotify()> to detect
-filesystem modifications in realtime.  In these cases it will not usually run
-the periodic C<lstat()> scans.
-
-Regardless of whether this setting is true or false, you can always manually
-trigger a rescan of the zones directory for new data by sending the daemon a
-C<SIGUSR1> (or executing the "reload-zones" command, which sends SIGUSR1 for
-you).
-
-=item B<zones_rfc1035_auto_interval>
-
-Integer seconds, default 31, min 10, max 600.  Only applies when
-C<zones_rfc1035_auto> is C<true>.
-
-Sets the time interval for periodically checking the zonefile directory for
-changes.  On systems which support C<inotify()>, however, the automatic mode
-will almost always use that mechanism instead for even faster detection with
-less overhead.  In the C<inotify()> case, the interval is used only
-occasionally as a fallback mechanism to recover a consistent state after
-temporary C<inotify()> failures due to inotify queue overflows or the zones
-directory itself being moved/deleted, etc.
-
-=item B<zones_rfc1035_quiesce>
-
-Floating-point seconds, default 3.0, min 1.02, max 60.0
-
-Regardless of whether you're using C<zones_rfc1035_auto> and/or explicit zone
-reloads, this interval defines a quiescence delay timer that's commonly used
-to coalesce multiple updates to the same file, avoid race conditions with
-zonefile writers, and potentially avoid filesystem timestamp issues.  This
-timer value is also used as the delay to retry loading a zonefile indefinitely
-if it fails to load when we first detected a change due to e.g. permissions or
-locking issues (as opposed to parse failure).
-
-The timer doesn't generally apply in the C<inotify()> case unless there are
-multiple nearly-simultaneous events for the same file, or (usually) when the
-file is modified in-place, or again if there's a filesystem-level rather than
-parser-level issue loading the zonefile.
-
-It is highly recommended that whatever tools or scripts you use to manage
-zonefile updates use atomic operations (in commandline terms: C<mv>, C<rm> and
-C<ln> (without C<-s>!); in syscall terms: C<rename()>, C<unlink()>, and
-C<link()>) to replace them regardless of whether your system supports
-C<inotify()> and regardless of whether you're using C<zones_rfc1035_auto> or
-not.  The scanner ignores subdirectories and dotfiles; feel free to use those
-to write out the file initially before atomically putting data into view.
-
-Performing non-atomic operations (e.g. in-place writes) on an active zonefile
-is inherently racy, especially if more than one update occurs in less time
-than the timestamp accuracy of the filesystem.  The daemon makes some
-accommodations for handling these races, but there will always be ugly corner
-cases.  It may help slightly if the in-place updater acquires an C<fcntl()>
-advisory writelock.  In-place writes will be B<especially> unreliable if you
-overwrite a file while the daemon is scanning the directory during its initial
-startup, as no quiescence timers or other anti-race mechanisms are used during
-startup (as these would necessarily delay service availability).
-
-Note that in the general case if a zone file never goes the full quiescence
-period without having yet another update applied to it, the new data may never
-actually be reloaded, as the daemon will constantly be trying to wait for a
-full period of quiescence on the file before loading it.
+Note that in general, improving the I/O performance of reading the zonefiles
+from disk (e.g. put them on an SSD) tends to help more than the parallelization
+here does, although both together is even better!
 
 =item B<lock_mem>
 
@@ -393,19 +426,8 @@ C<mlockall(MCL_CURRENT|MCL_FUTURE)>, which effectively locks all daemon
 memory into RAM, unable to be swapped.  Possibly helpful in some
 production cases to ensure swap-in doesn't affect DNS latency.
 
-When started as root with lock_mem set to true, the daemon will remove
-any ulimits on locked memory before dropping privileges.  When started
-as a regular user it may not be able to do so, and those limits could
-cause the server to abort execution at any time if they are set too low.
-
-=item B<priority>
-
-Signed integer, range -20 to +20, lower values are higher priority.  If
-explicitly set, gdnsd will attempt C<setpriority()> to this value on
-startup.  If left unset and gdnsd is started as a normal user, no
-C<setpriority()> call will be made.  If left unset and gdnsd is started
-as root, it will default to calling C<setpriority()> with the value
-C<-11>.
+You'll need to ensure the ulimit for locked memory is sufficient large (e.g.
+"infinity") to avoid process death.
 
 =item B<disable_text_autosplit>
 
@@ -418,7 +440,7 @@ chunk.
 
 Ordinarily, you may specify chunk(s) of a C<TXT> record in gdnsd
 zonefiles as a string of any size up to the legal length (just short of
-64K in practice), and gdnsd will auto-split the data into 255-byte
+16K in practice), and gdnsd will auto-split the data into 255-byte
 chunks for transmission over the DNS protocol correctly.  If you choose
 to manually break up your TXT record into multiple strings in the
 zonefile, gdnsd also honors these boundaries and will not attempt to
@@ -429,126 +451,38 @@ disabled, and any single character string specified in a zonefile as
 part of a C<TXT> record which is larger than 255 bytes will
 be considered a syntax error.
 
-=item B<include_optional_ns>
-
-Boolean, default false.  Causes the daemon to include the optional NS
-records in the Authority section of simple authoritative responses
-containing actual response data.  Leaving this option in its default
-state results in smaller response packets and faster response packet
-generation in many common cases.  This is similar in nature to (but not
-exactly like) BIND's "minimal-responses" option, except that we default
-to the minimal mode.
-
-Regardless of this setting, all *necessary* Authority-section records
-are always included, such as when they are necessary for delegation
-responses, NXDOMAIN responses, and NOERROR responses containing no
-RRsets in the answer section.
-
-=item B<plugin_search_path>
-
-A single string or an array of strings, default empty.  Normally the
-daemon searches for plugins in the fixed path C<@GDNSD_DEFPATH_LIB@>,
-using filenames of the form C<plugin_${name}.so>.  If you define this
-parameter, all paths in this list will be searched in the given order
-for plugins *before* trying the default, fixed search path.
-
-=item B<realtime_stats>
-
-Boolean, default false.  Normally the daemon self-imposes a limit of
-not recalculating the daemon-wide statistics more often than once per
-second.  This improves efficiency in the case that the polling traffic
-on our HTTP interface gets high.
-
-For most uses the default should be fine.  If you set this option to
-true, the stats will be recalculated on the spot for every stats
-request.  The test suite uses this so that it can double-check
-statistics counters between every request it sends.  I don't imagine
-anyone else will need to use this option, and it could even be
-determinental to performance on SMP machines.
-
-=item B<max_response>
-
-Integer, default 16384, min 4096, max 64000.  This number is used to
-size the per-I/O-thread buffers that we construct response packets in.
-For any sane, normal use of the DNS, the default value is far more than
-enough.  For embedded or other low memory hosts, you might even
-consider setting this smaller than default to save a bunch of
-per-socket-context buffer space.
-
-However, if you have strange DNS data that's very large (giant RRsets,
-giant blobs of data in TXT records) which might generate response
-packets greater than the 16K default max here, you *must* set this
-parameter large enough to accommodate them or random very bad things
-will happen.  It should be noted that the odds are high whatever you're
-trying to do is misguided in the first place.  You can size this by
-setting it to the max and running some test queries via "dig" (or a
-similar tool) to find your limit.
-
-This number does not need to take into account UDP, IP, or any
-lower-level headers.  Typically when probing your data for the largest
-response sizes you should do C<ANY> queries and/or specific RR-type
-queries against the first CNAME in any CNAME chains leading to large
-RR-sets.  Keep in mind that the C<include_optional_ns> option will
-affect the sizing as well.  Also keep in mind that wildcards and
-delegations can match any child name, including ones of maximal overall
-length.
-
 =item B<max_edns_response>
 
-Integer, default 1410, min 512, max 64000.  This is the maximum size
-of a UDP edns response to a client, acting as a cap on the edns
-buffer size advertised by the client in its request.
+Integer, default 1232, min 512, max 16384.  This is the maximum size
+of a UDP edns response to a client over IPv4, acting as a cap on
+the edns buffer size advertised by the client in its request.
 
-The default of 1410 is the largest size suggested in RFC 6891 when
-falling back from the inability to deliver 4K-sized packets, and it
-seems very likely to be a successful size for unfragmented delivery
-on most networks today even given IPv6 and some reasonable tunneling.
+It is recommended that you do not raise this value from the default for
+a server facing the public Internet.
+
+Setting this in the ~4-16K range might be desirable if you have large
+response RR-sets and are willing to tolerate some fragmentation,
+especially in a private network where a larger path MTU (e.g. ~9K for
+ethernet jumbo frames) can be guaranteed.
 
 The option obviously has no pragmatic effect if you do not have
 large response datasets in your zones in the first place.
 
-This value will be capped at the configured (or default) value of
-C<max_response> with a warning if configured above that value.
+=item B<max_edns_response_v6>
 
-=item B<max_addtl_rrsets>
+Integer, default 1232, min 512, max 16384.
 
-Integer, default 64, min 16, max 256.  This is the maximum number of RR
-sets that will ever be added to the Additional section of a response
-packet.  This sets a hard limit on the number of delegation glue NS
-records a subzone can have (which is checked at startup), and a runtime
-soft limit on other Additional section RR sets.  When the limit is
-reached at runtime, the remaining potential additional RR sets are
-simply not added to the packet.  Most users won't need to raise this
-value, and users on low-memory/embedded hosts might want to lower it to
-save more memory.
-
-=item B<max_cname_depth>
-
-Integer, default 16, min 4, max 24.  How deep CNAME -> CNAME chains are
-allowed to recurse within local data in a single zonefile.  If a chain
-longer than this is detected between normal static CNAME entries in the
-authoritative data of a single zonefile, an error will be thrown when
-loading the zonefile.
-
-If the limit is exceeded at runtime (due to C<DYNC> dynamic CNAME
-responses) the code will halt further recursive lookups for this
-request and return an empty B<NXDOMAIN> response, and log a loud
-message to syslog on every single request for this broken domainname.
-
-Note that this is the only thing preventing infinite CNAME loops caused
-by bad DYNC plugin configurations.  Also note that even in the C<DYNC>
-case, all of this applies only within a single zone.  The gdnsd code
-never crosses the boundary between two distinct local zonefiles when
-processing queries.
+As above for UDP edns responses over IPv6.  Once again, raising this
+above its default value is not recommended for a public-facing server.
 
 =item B<edns_client_subnet>
 
 Boolean, default true.  Enables support for the edns-client-subnet
-option.  gdnsd only includes this EDNS option in responses to queries
-which also contained the option.  In the case of normal responses from
-static zone data, the scope mask will be set to zero.  Dynamic response
-plugins have access to the query's EDNS client-subnet data, and have
-full control over the response scope mask.
+option from RFC 7871.  gdnsd only includes this EDNS option in responses
+to queries which also contained the option.  In the case of normal
+responses from static zone data, the scope mask will be set to zero.
+Dynamic response plugins have access to the query's EDNS client-subnet
+data, and have full control over the response scope mask.
 
 If the option is set to false, gdnsd will ignore the option in queries,
 never set it in its responses, and plugins will not have access to any
@@ -557,11 +491,6 @@ data provided by any ignored edns-client-subnet option in queries.
 Of the included standard plugins only C<reflect> and C<geoip> make use
 of edns-client-subnet information.  The rest will leave the scope mask
 at zero as normal for client-location-agnostic static data.
-
-Relevant links documenting edns-client-subnet:
-
-L<http://www.afasterinternet.com/>
-L<http://tools.ietf.org/html/draft-vandergaast-edns-client-subnet-00>
 
 =item B<chaos_response>
 
@@ -573,62 +502,198 @@ version reporting, which responds to "version.bind" queries in the
 C<CH> class, and is what a client will see if they use such a query
 against a gdnsd server.
 
-=item B<log_stats>
+=item B<acme_challenge_ttl>
 
-Integer, default 3600, min 0, max 86400.  The current stats counters
-will be emitted as log output (e.g. to syslog) every C<log_stats>
-seconds.  If set to zero, periodic stats logging is disabled.
-Regardless of this setting, stats counters are always emitted to the log
-once at the time of daemon shutdown.
+Integer seconds, range 60-3600, default 600.  For temporary ACME DNS-01
+challenge data added via C<gdnsdctl acme-dns-01 ...>, this sets the time
+until the TXT records auto-expire from the server and dissappear.
+
+See the L<gdnsdctl(8)> documentation about C<acme-dns-01> for more details.
+
+=item B<acme_challenge_dns_ttl>
+
+Integer seconds, range 0-3600, default 0.  For temporary ACME DNS-01
+challenge data added via C<gdnsdctl acme-dns-01 ...>, this sets the DNS TTL
+value which is used in response TXT RRs.
+
+In previous versions, the DNS TTL value mirrored the expiry TTL from
+C<acme_challenge_ttl> above.  However, this (non-zero DNS TTLs for these
+records in general) has lead to confusing issues in the real world with ACME
+servers under certain conditions.
+
+Note that static zonefile RRs with C<_acme-challenge> as their leading label
+are also forced to this TTL regardless of the zonefile-level explicit TTL,
+to avoid cases of mixed TTLs when mixing static and dynamic records in
+server outputs.
+
+=item B<nsid>
+
+String, no default, 2-256 chars in length.  Character count must be
+even, and all characters must be ASCII hex digits.  This encodes up to
+128 bytes of arbitrary binary data chosen by the administrator and
+serves it in the EDNS NSID (RFC 5001) option data of all response
+packets.  The NSID is obviously not emitted to clients unless they
+request it via EDNS, and is not emitted at all unless this option
+is specified explicitly.  This is intended to help with the
+identification of specific servers when multiple servers are part
+of an anycast or loadbalancer pool.
+
+=item B<nsid_ascii>
+
+String, no default, 1-128 chars of printable ASCII characters.
+This is an convenience alternative to C<nsid> above, allowing the binary NSID
+data to be configured with the bytes of a printable ASCII string up to 128
+bytes in length.  Only one of C<nsid> or C<nsid_ascii> may be specified.
+
+=item B<experimental_no_chain>
+
+Boolean, default true.
+
+If set to true (the default), when a query for any RR type encounters a
+C<CNAME> RR in the zone data, the behavior of the server will be as if the
+queried type was C<CNAME>.  This implies no chasing of the target
+(right-hand-side) name to emit any further answer-section records or
+delegations related to the target, even if they exist in the local data of the
+same zone.
+
+This option is likely to become the fixed behavior (no option to disable) in a
+future release.  If this new default behavior causes a problem, you can (for
+now!) set the option to false to revert to the traditional behavior of emitting
+chained multi-RR responses for zone-local CNAMEs as a workaround.  Please file
+a bug report if so, otherwise we'll have no feedback to go on!
+
+This behavior is desirable for a few reasons:
+
+RFC 7871 (edns-client-subnet) actually recommends it for at least subnet
+differentiated responses, because otherwise it's ambiguous which of the
+multiple answer-section records the subnet scoping applies to, and caches
+invariably have to take a pessimistic view and subnet-fragment cache entries
+pointlessly.  This is the most-compelling rationale, and it has impact on what
+kind of efficient geodns setups can work at all for certain use-cases.
+
+It also adheres to the general principle of minimal responses we adhere to
+elsewhere (caches may have the target cached already anyways), and it helps
+minimize response sizes (reduce reflection, and esp helpful for DNSSEC in the
+future).
+
+Also, if this were the fixed behavior of the server, rather than configurable,
+it would significantly simplify the code and make lookups more efficient (these
+gains are not realized by the experimental optional version).
+
+However, it's also RFC-questionable.  The original RFC1034 algorithms ask that
+authoritative servers complete local CNAME chains from local data (which this
+violates), but also requires recursors to complete them remotely (which makes
+this work, and which most do now, but historically some older implementations
+implicitly relied on the authserver doing it).  RFC 2308 also touches on this
+topic, and the TL;DR there is that recursors can tell our incomplete responses
+from actual negative "No Data" responses about the next name in the chain by
+the fact that we don't emit an SOA record in the auth section.
+
+Update 2020-11: this has now been tested pretty widely on the Internet (by a
+major site with a global audience of millions), for a very long time (nearly
+two years), and there has been no evidence so far of breakage or failure
+reports from real users.
+
+=item B<disable_cookies>
+
+Boolean, default false.  Disables support for RFC 7873 EDNS Cookies.  Not
+recommended, as these cookies provide a layer of defense against both off-path
+response forgery and amplification attacks.  One possible legitimate reason to
+disable cookies would be if gdnsd is operating in a mixed set of
+loadbalanced/anycasted auth servers and some of the other servers do not
+support cookies, or use different algorithms than gdnsd.  Our cookie support is
+fairly efficient; there shouldn't be any major performance reason to disable
+it.
+
+=item B<max_nocookie_response>
+
+Integer bytes, default zero (disabled), range 128-1024.  If this parameter is
+set to a non-zero value, all UDP responses will be limited to this many bytes
+unless the query presents a valid EDNS Cookie that the server recognizes as its
+own.  Responses which fail this check (UDP with no valid cookie and larger than
+this length) will be truncated fully (no response RRs) and the TC-bit will be
+set, asking the client to retry over TCP.
+
+This is intended to limit the ability of attackers to use your server as a
+reflection source for amplification attacks, as valid cookies give some
+reasonable guarantee that the query packet source address wasn't forged.  It
+B<should> be pretty safe to set this at least as low as 512, and that may
+become the default setting in some future version.
+
+=item B<cookie_key_file>
+
+String, default undefined.  When this is defined, the file's contents are read
+as the persistent master key value for generating EDNS Cookie responses.
+
+If the file exists, it must be readable by the daemon, and it must contain 32
+bytes of binary data.  Failure to properly read a key file defined here is
+fatal at startup.  Permissions should be set with care, so that other
+unprivileged users of the system cannot read the key.
+
+Note that the contents are considered binary data and are used B<directly> as
+secret key input to crypto algorithms, and thus they should be generated
+securely with high entropy and indistinguishable from random bytes.  It is
+recommended the file's contents be generated with an RNG outputting 32 random
+binary bytes, e.g.: C<dd if=/dev/urandom of=cookie.key bs=32 count=1>.
+
+The keyfile's contents don't have to be changed on any sort of fixed or
+frequent schedule to maintain security.  Treat it like any other long-term
+secret value and make new ones once in a blue moon just out of an abundance of
+caution, or if you believe the previous key material may be compromised.  The
+daemon must be replaced or restarted to put the new key into effect, and this
+will abruptly invalidate outstanding cookies clients may be holding that were
+generated with previous keys.
+
+The primary reason to define C<cookie_key_file> to your own pathname and key
+contents is to have synchronized cookie keys across an anycasted or otherwise
+loadbalanced set of servers, so that they all agree on server cookies.
+
+If this file is not defined, then the daemon manages the cookie master key
+value automatically.  Under automatic management of the key, it will attempt to
+read a key from F<@GDNSD_DEFPATH_RUN@/cookie.autokey> at startup.  If that
+doesn't work, it will generate a new random key in memory and attempt to write
+it to the same path for consumption by future daemons.  If both reading an old
+automatic key and writing the new one fail, a non-fatal error will be logged,
+and the new randomly-generated key exists only in daemon memory and will not
+persist across future daemon replace or restart cycles.
+
+Note that in common Linux/systemd installations, the run directory will be
+wiped on OS reboots and a fresh key will be generated on the next daemon
+startup.  As with a manually-defined C<cookie_key_file>, any time the automatic
+key must be regenerated, this will invalidate all outstanding server cookies
+held by clients.
 
 =item B<run_dir>
 
-String, defaults to F<@GDNSD_DEFPATH_RUN@>.  This is the directory
-which the daemon owns as its run directory.  It will create this
-directory and/or modify the permissions and ownership of it
-on startup.  If it does not exist and cannot be created, or the
-permissions and ownership cannot be set to acceptable values, the
-daemon will not start.
+String, defaults to F<@GDNSD_DEFPATH_RUN@>.  This is the directory which the
+daemon owns as its run directory.
+
+It will create this directory or modify the permissions of an existng one on
+startup.  If it does not exist and cannot be created, or the permissions cannot
+be set to acceptable values (possibly because the existing directory is owned
+by a different uid than the daemon is currently running as), the daemon will
+not start.
 
 The contents of this directory are private to the daemon and
 shouldn't be interfered with.  This can live on a filesystem that's
 volatile across reboots, and doesn't require much disk space.
 
+The daemon's control socket and lock files live here.
+
 =item B<state_dir>
 
 String, defaults to F<@GDNSD_DEFPATH_STATE@>.  This is the directory
-which the daemon owns as its state directory.  It will create this
-directory and/or modify the permissions and ownership of it
-on startup.  If it does not exist and cannot be created, or the
-permissions and ownership cannot be set to acceptable values, the
-daemon will not start.
+which the daemon owns as its state directory.
+
+It will create this directory if necessary at startup.  If it does not exist
+and cannot be created, the daemon will not start.
 
 The contents of this directory belong to the system administrator
 and are used to communicate persistent, stateful information to
 the daemon.  This should live on a filesystem which is preserved
 across reboots.
 
-=item B<any_mitigation>
-
-Boolean, default true.  If true, the server will attempt to mitigate
-problems with ANY-query reflection attacks over UDP.  As ANY queries
-tend to have the largest response sizes, they are an obvious target for
-amplified reflection attacks using gdnsd as the traffic source.  ANY
-queries aren't commonly used by legitimate clients; they're mostly for
-debugging.
-
-Currently gdnsd's only mechanism for mitigation is forcing legitimate
-clients to use TCP for ANY queries by sending a truncated UDP response.
-Truncation responses are a normal expectation regardless, and supporting
-DNS over TCP is a requirement of the DNS.  Therefore this should cause
-no real-world performance or interoperability problems in exchange for
-the protection it offers.
-
-In future releases, C<any_mitigation> may behave differently and allow
-some ANY-over-UDP traffic to succeed when it's safe to do so.  For
-example, it may allow ANY over UDP up to a certain response ratelimit,
-and/or it may allow ANY over UDP when the request source is weakly
-validated by an edns0 cookie.
+The F<admin_state> file lives here.
 
 =back
 
@@ -956,19 +1021,17 @@ Example 1 (simple and clean):
 
   options = {
     listen = [ 192.0.2.1, 192.0.2.2 ],
-    http_listen = 127.0.0.1,
   }
 
 Example 2 (fat arrows, no commas, some arbitrary quoting):
 
   "options" => {
     listen => [ 192.0.2.1 192.0.2.2 ]
-    http_listen => "127.0.0.1"
   }
 
 Example 3 (compressed and ugly):
 
-  options={listen=[192.0.2.1 192.0.2.2]http_listen=127.0.0.1}
+  options={listen=[192.0.2.1 192.0.2.2]}
 
 =head1 INCLUDING OTHER FILES
 
@@ -1055,7 +1118,6 @@ L<gdnsd(8)>, L<gdnsd.zonefile(5)>, L<gdnsd-plugin-simplefo(8)>,
 L<gdnsd-plugin-multifo(8)>, L<gdnsd-plugin-weighted(8)>,
 L<gdnsd-plugin-metafo(8)>, L<gdnsd-plugin-geoip(8)>,
 L<gdnsd-plugin-extmon(8)>, L<gdnsd-plugin-extfile(8)>
-L<gdnsd-plugin-api(3)>
 
 The gdnsd manual.
 

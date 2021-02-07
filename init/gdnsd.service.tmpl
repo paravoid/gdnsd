@@ -1,0 +1,56 @@
+[Unit]
+Description=gdnsd
+Documentation=man:gdnsd
+After=local-fs.target
+After=network.target
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+Type=notify
+NotifyAccess=all
+ExecStart=@GDNSD_SBINDIR@/gdnsd -l start
+ExecStop=@GDNSD_BINDIR@/gdnsdctl -l stop
+ExecReload=@GDNSD_BINDIR@/gdnsdctl -l replace
+
+# The very basics: run as non-root user, allow binding port 53,
+# and manage the run directory
+UMask=0022
+User=gdnsd
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+RuntimeDirectory=gdnsd
+RuntimeDirectoryMode=0700
+
+#---
+# Optional performance/reliability config:
+#---
+
+# Usually an authdns server is critical infrastructure and performance
+# sensitive; make it less likely to be oomkilled if something else goes crazy
+# and set a better-than-default nice level:
+OOMScoreAdjust=-900
+Nice=-11
+
+# Allows successful "lock_mem = true" configuration (can be left out otherwise)
+LimitMEMLOCK=infinity
+
+#---
+# Things below this mark are not strictly required for proper operation,
+# they're just considered good baseline conservative security defaults for a
+# standard installation in system paths that isn't doing anything tricky.
+# Installing to /usr/local might complicate things (especially might require
+# removing ProtectSystem=full), and obviously various configurations of the
+# extmon plugin might require relaxing many of the other security options to
+# allow an external binary to do its work underneath gdnsd_extmon_helper.
+#---
+
+NoNewPrivileges=yes
+SecureBits=noroot noroot-locked no-setuid-fixup no-setuid-fixup-locked
+MountFlags=slave
+DevicePolicy=closed
+PrivateDevices=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true

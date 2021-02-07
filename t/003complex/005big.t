@@ -1,18 +1,28 @@
-# Oversized data sets, truncation, tcp, edns0, etc...
+# Oversized data sets, truncation, tcp, edns, etc...
 
 use _GDT ();
 use Test::More tests => 14;
 
 my $pid = _GDT->test_spawn_daemon();
 
-$optrr = Net::DNS::RR->new(
+my $optrr = Net::DNS::RR->new(
     type => "OPT",
-    ednsversion => 0,
+    version => 0,
     name => "",
-    class => 1024,
-    extendedrcode => 0,
-    ednsflags => 0,
+    size => 1024,
+    rcode => 0,
+    flags => 0,
 );
+
+my $optrr_keepalive = Net::DNS::RR->new(
+    type => "OPT",
+    version => 0,
+    name => "",
+    size => 1024,
+    rcode => 0,
+    flags => 0,
+);
+$optrr_keepalive->option(11 => pack('n', 370));
 
 my $big_answers = [
     'big.example.com 21600 MX 0 asdf.example.com',
@@ -131,25 +141,23 @@ my $vbig_additional = [
 ];
 
 _GDT->test_dns(
-    resopts => { usevc => 0, igntc => 1, udppacketsize => 512 },
+    resopts => { usevc => 0, igntc => 1 },
     qname => 'big.example.com', qtype => 'MX',
     header => { tc => 1 },
     stats => [qw/udp_reqs udp_tc noerror/],
 );
 
 _GDT->test_dns(
-    resopts => { usevc => 1, igntc => 0, udppacketsize => 512 },
+    resopts => { usevc => 1, igntc => 0 },
     qname => 'big.example.com', qtype => 'MX',
     answer => $big_answers,
-    addtl => $big_additional,
-    stats => [qw/tcp_reqs noerror/],
+    stats => [qw/tcp_reqs tcp_conns noerror/],
 );
 
 _GDT->test_dns(
-    resopts => { usevc => 0, igntc => 0, udppacketsize => 512 },
+    resopts => { usevc => 0, igntc => 0 },
     qname => 'big.example.com', qtype => 'MX',
     answer => $big_answers,
-    addtl => $big_additional,
     stats => [qw/udp_reqs udp_tc tcp_reqs noerror noerror/],
 );
 
@@ -157,7 +165,7 @@ _GDT->test_dns(
     resopts => { usevc => 0, igntc => 1, udppacketsize => 1200 },
     qname => 'big.example.com', qtype => 'MX',
     answer => $big_answers,
-    addtl => [@$big_additional, $optrr],
+    addtl => $optrr,
     stats => [qw/udp_reqs edns udp_edns_big noerror/],
 );
 
@@ -173,31 +181,29 @@ _GDT->test_dns(
     resopts => { usevc => 0, igntc => 0, udppacketsize => 600 },
     qname => 'big.example.com', qtype => 'MX',
     answer => $big_answers,
-    addtl => [@$big_additional, $optrr],
+    addtl => $optrr_keepalive,
     stats => [qw/udp_reqs udp_edns_tc tcp_reqs edns edns noerror noerror/],
 );
 
 # Now all of the above again, but for vbig:
 _GDT->test_dns(
-    resopts => { usevc => 0, igntc => 1, udppacketsize => 512 },
+    resopts => { usevc => 0, igntc => 1 },
     qname => 'vbig.example.com', qtype => 'MX',
     header => { tc => 1 },
     stats => [qw/udp_reqs udp_tc noerror/],
 );
 
 _GDT->test_dns(
-    resopts => { usevc => 1, igntc => 0, udppacketsize => 512 },
+    resopts => { usevc => 1, igntc => 0 },
     qname => 'vbig.example.com', qtype => 'MX',
     answer => $vbig_answers,
-    addtl => $vbig_additional,
     stats => [qw/tcp_reqs noerror/],
 );
 
 _GDT->test_dns(
-    resopts => { usevc => 0, igntc => 0, udppacketsize => 512 },
+    resopts => { usevc => 0, igntc => 0 },
     qname => 'vbig.example.com', qtype => 'MX',
     answer => $vbig_answers,
-    addtl => $vbig_additional,
     stats => [qw/udp_reqs udp_tc tcp_reqs noerror noerror/],
 );
 
@@ -205,7 +211,7 @@ _GDT->test_dns(
     resopts => { usevc => 0, igntc => 1, udppacketsize => 2560 },
     qname => 'vbig.example.com', qtype => 'MX',
     answer => $vbig_answers,
-    addtl => [@$vbig_additional, $optrr],
+    addtl => $optrr,
     stats => [qw/udp_reqs edns udp_edns_big noerror/],
 );
 
@@ -221,7 +227,7 @@ _GDT->test_dns(
     resopts => { usevc => 0, igntc => 0, udppacketsize => 900 },
     qname => 'vbig.example.com', qtype => 'MX',
     answer => $vbig_answers,
-    addtl => [@$vbig_additional, $optrr],
+    addtl => $optrr_keepalive,
     stats => [qw/udp_reqs udp_edns_tc tcp_reqs edns edns noerror noerror/],
 );
 

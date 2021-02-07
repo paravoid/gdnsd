@@ -26,8 +26,14 @@
 #  error Your GCC is way too old (< 3.4)...
 #endif
 
-// Basic features common to clang and gcc
+#define PRAG_(x) _Pragma(#x)
+
+// Basic features common to clang and gcc-3.4+
 #if defined __clang__ || defined __GNUC__
+#  define F_PRINTF(X, Y)  __attribute__((__format__(__printf__, X, Y)))
+#  define F_NONNULLX(...) __attribute__((__nonnull__(__VA_ARGS__)))
+#  define F_NONNULL       __attribute__((__nonnull__))
+#  define F_NORETURN      __attribute__((__noreturn__))
 #  define HAVE_BUILTIN_CLZ 1
 #  define likely(_x)      __builtin_expect(!!(_x), 1)
 #  define unlikely(_x)    __builtin_expect(!!(_x), 0)
@@ -36,16 +42,25 @@
 #  define F_CONST         __attribute__((__const__))
 #  define F_PURE          __attribute__((__pure__))
 #  define F_MALLOC        __attribute__((__malloc__)) __attribute__((__warn_unused_result__))
-#  define F_NORETURN      __attribute__((__noreturn__))
 #  define F_NOINLINE      __attribute__((__noinline__))
-#  define F_NONNULLX(...) __attribute__((__nonnull__(__VA_ARGS__)))
-#  define F_NONNULL       __attribute__((__nonnull__))
 #  define F_WUNUSED       __attribute__((__warn_unused_result__))
 #  define F_DEPRECATED    __attribute__((__deprecated__))
 #endif
 
 // Newer features
 #ifdef __clang__
+#  define GDNSD_DIAG_PUSH_IGNORED(x) _Pragma("clang diagnostic push") \
+                                   PRAG_(clang diagnostic ignored x)
+#  define GDNSD_DIAG_POP             _Pragma("clang diagnostic pop")
+#  if __has_builtin(__builtin_unreachable)
+#    define GDNSD_HAVE_UNREACH_BUILTIN 1
+#  endif
+#  if __has_attribute(cold)
+#    define F_COLD __attribute__((__cold__))
+#  endif
+#  if __has_attribute(returns_nonnull)
+#    define F_RETNN         __attribute__((__returns_nonnull__))
+#  endif
 #  if __has_attribute(hot)
 #    define F_HOT           __attribute__((__hot__))
 #  endif
@@ -55,27 +70,60 @@
 #  if __has_attribute(alloc_align)
 #    define F_ALLOCAL(_x)   __attribute__((__alloc_align__((_x))))
 #  endif
-#  if __has_attribute(returns_nonnull)
-#    define F_RETNN         __attribute__((__returns_nonnull__))
+#  if __has_attribute(fallthrough)
+#    define S_FALLTHROUGH __attribute__((__fallthrough__))
 #  endif
 #elif defined __GNUC__
 #  if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 3)
 #    define F_ALLOCSZ(...)  __attribute__((__alloc_size__(__VA_ARGS__)))
 #    define F_HOT           __attribute__((__hot__))
+#    define F_COLD __attribute__((__cold__))
+#  endif
+#  if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5)
+#    define GDNSD_HAVE_UNREACH_BUILTIN 1
+#  endif
+#  if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)
+#    define GDNSD_DIAG_PUSH_IGNORED(x) _Pragma("GCC diagnostic push") \
+                                     PRAG_(GCC diagnostic ignored x)
+#    define GDNSD_DIAG_POP             _Pragma("GCC diagnostic pop")
 #  endif
 #  if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 9)
-#    define F_ALLOCAL(_x)   __attribute__((__alloc_align__((_x))))
 #    define F_RETNN         __attribute__((__returns_nonnull__))
+#    define F_ALLOCAL(_x)   __attribute__((__alloc_align__((_x))))
+#  endif
+#  if __GNUC__ > 7 || (__GNUC__ == 7 && __GNUC_MINOR__ >= 1)
+#    define S_FALLTHROUGH __attribute__((__fallthrough__))
 #  endif
 #endif
 
 // defaults for unknown compilers and things left unset above
+#ifndef F_PRINTF
+#  define F_PRINTF(X, Y)
+#endif
+#ifndef F_NONNULLX
+#  define F_NONNULLX(...)
+#endif
+#ifndef F_NONNULL
+#  define F_NONNULL
+#endif
 #ifndef F_NORETURN
 #  if __STDC_VERSION__ >= 201112L // C11
 #    define F_NORETURN _Noreturn
 #  else
 #    define F_NORETURN
 #  endif
+#endif
+#ifndef F_COLD
+#  define F_COLD
+#endif
+#ifndef GDNSD_DIAG_PUSH_IGNORED
+#  define GDNSD_DIAG_PUSH_IGNORED(_x)
+#endif
+#ifndef GDNSD_DIAG_POP
+#  define GDNSD_DIAG_POP
+#endif
+#ifndef   F_RETNN
+#  define F_RETNN
 #endif
 #ifndef likely
 #  define likely(_x) (!!(_x))
@@ -101,12 +149,6 @@
 #ifndef   F_NOINLINE
 #  define F_NOINLINE
 #endif
-#ifndef   F_NONNULLX
-#  define F_NONNULLX(...)
-#endif
-#ifndef   F_NONNULL
-#  define F_NONNULL
-#endif
 #ifndef   F_WUNUSED
 #  define F_WUNUSED
 #endif
@@ -122,68 +164,32 @@
 #ifndef   F_ALLOCAL
 #  define F_ALLOCAL(_x)
 #endif
-#ifndef   F_RETNN
-#  define F_RETNN
+#ifndef   S_FALLTHROUGH
+#  define S_FALLTHROUGH ((void)(0))
 #endif
 
-// This is a GCC-ism which also seems to be supported
+// Unaligned memory access stuff
+// "packed" is a GCC-ism which also seems to be supported
 //    by other common compilers on our platforms.  If it
 //    breaks for you, please file a bug report and we'll
 //    find a way to fix it.
-#define S_PACKED __attribute__((__packed__))
-
-// Unaligned memory access stuff
 #include <inttypes.h>
-struct _gdnsd_una16 { uint16_t x; } S_PACKED;
-struct _gdnsd_una32 { uint32_t x; } S_PACKED;
-#define gdnsd_get_una16(_p) (((const struct _gdnsd_una16*)(_p))->x)
-#define gdnsd_get_una32(_p) (((const struct _gdnsd_una32*)(_p))->x)
-#define gdnsd_put_una16(_v,_p) (((struct _gdnsd_una16*)(_p))->x) = (_v)
-#define gdnsd_put_una32(_v,_p) (((struct _gdnsd_una32*)(_p))->x) = (_v)
+struct gdnsd_una16_ {
+    uint16_t x;
+} __attribute__((__packed__));
+struct gdnsd_una32_ {
+    uint32_t x;
+} __attribute__((__packed__));
+struct gdnsd_una64_ {
+    uint64_t x;
+} __attribute__((__packed__));
+#define gdnsd_get_una16(_p) (((const struct gdnsd_una16_*)(_p))->x)
+#define gdnsd_get_una32(_p) (((const struct gdnsd_una32_*)(_p))->x)
+#define gdnsd_get_una64(_p) (((const struct gdnsd_una64_*)(_p))->x)
+#define gdnsd_put_una16(_v, _p) (((struct gdnsd_una16_*)(_p))->x) = (_v)
+#define gdnsd_put_una32(_v, _p) (((struct gdnsd_una32_*)(_p))->x) = (_v)
 
 // Generic useful macros
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
-
-// Valgrind hooks for debug builds
-#if !defined(NDEBUG) && defined(HAVE_VALGRIND_MEMCHECK_H) && !defined(_CPPCHECK)
-#  include <valgrind/memcheck.h>
-#define NOWARN_VALGRIND_MAKE_MEM_NOACCESS(x,y) \
-    do { int _x V_UNUSED; _x = VALGRIND_MAKE_MEM_NOACCESS(x,y); } while(0)
-#else
-#  define RUNNING_ON_VALGRIND 0
-#  define NOWARN_VALGRIND_MAKE_MEM_NOACCESS(x,y) ((void)(0))
-#  define VALGRIND_CREATE_MEMPOOL(x,y,z)  ((void)(0))
-#  define VALGRIND_DESTROY_MEMPOOL(x)     ((void)(0))
-#  define VALGRIND_MEMPOOL_ALLOC(x,y,z)   ((void)(0))
-#endif
-
-// And silence some related warnings on gcc 4.6 + valgrind 3.6
-#if !defined(NDEBUG) && defined(__GNUC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ > 5))
-#  define NOWARN_VALGRIND_CREATE_MEMPOOL(x,y,z) { \
-     _Pragma("GCC diagnostic push"); \
-     _Pragma("GCC diagnostic ignored \"-Wunused-but-set-variable\""); \
-     VALGRIND_CREATE_MEMPOOL(x,y,z); \
-     _Pragma("GCC diagnostic pop"); \
-}
-#  define NOWARN_VALGRIND_DESTROY_MEMPOOL(x) { \
-     _Pragma("GCC diagnostic push"); \
-     _Pragma("GCC diagnostic ignored \"-Wunused-but-set-variable\""); \
-     VALGRIND_DESTROY_MEMPOOL(x); \
-     _Pragma("GCC diagnostic pop"); \
-}
-#  define NOWARN_VALGRIND_MEMPOOL_ALLOC(x,y,z) { \
-     _Pragma("GCC diagnostic push"); \
-     _Pragma("GCC diagnostic ignored \"-Wunused-but-set-variable\""); \
-     VALGRIND_MEMPOOL_ALLOC(x,y,z); \
-     _Pragma("GCC diagnostic pop"); \
-}
-#else
-#  define NOWARN_VALGRIND_CREATE_MEMPOOL(x,y,z) \
-     VALGRIND_CREATE_MEMPOOL(x,y,z)
-#  define NOWARN_VALGRIND_DESTROY_MEMPOOL(x) \
-     VALGRIND_DESTROY_MEMPOOL(x)
-#  define NOWARN_VALGRIND_MEMPOOL_ALLOC(x,y,z) \
-     VALGRIND_MEMPOOL_ALLOC(x,y,z);
-#endif
 
 #endif // GDNSD_COMPILER_H

@@ -1,14 +1,14 @@
 SUBDIRS = libtap libgdmaps
 
-EXTRA_DIST = README-NETDNS _GDT.pm _FakeGeoIP.pm Net $(srcdir)/[0-9]*/* $(srcdir)/[0-9]*/*/*
+EXTRA_DIST = _GDT.pm $(srcdir)/[0-9]*/* $(srcdir)/[0-9]*/*/*
 TESTOUT_DIR = $(abs_builddir)/testout
 ALLTESTS = $(srcdir)/[0-9]*/*.t
 
 # re-use silent-rules to set "prove" execution mode:
 #  V=0 -> quiet + parallelized
 #  V=1 -> verbose + serial
-# Note test concurrency is TEST_CPUS * 2; we do a lot of sleeping/waiting...
-prove_mode_0 = -q --merge -j$$(($(TEST_CPUS) * 2)) --state=slow,save
+# Note test concurrency is TEST_CPUS * 4; we do a lot of sleeping/waiting...
+prove_mode_0 = -q --merge -j$$(($(TEST_CPUS) * 4)) --state=slow,save
 prove_mode_1 = -v -f
 prove_mode_  = $(prove_mode_@AM_DEFAULT_V@)
 prove_mode   = $(prove_mode_@AM_V@)
@@ -20,7 +20,7 @@ precheck:
 	@$(MKDIR_P) $(TESTOUT_DIR); \
 	echo Test data/outputs will be stored at $(TESTOUT_DIR)
 
-# To run just one test subdir: make check TRUN=007plugins/*.t
+# To run just one test subdir: make check V=1 TRUN=007plugins/*.t
 check-local: precheck
 	${AM_V_GEN}if test "${TRUN}x" != "x"; then \
 		TOP_BUILDDIR=$(abs_top_builddir) $(TEXEC) $(srcdir)/${TRUN}; \

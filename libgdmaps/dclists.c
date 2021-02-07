@@ -60,48 +60,52 @@
 //  used on true shutdown of the whole gdmap (only debug
 //  mode for the real plugin).
 
-struct _dclists {
+struct dclists {
     unsigned count; // count of unique result lists
     unsigned old_count; // count from object we cloned from
     uint8_t** list;    // strings of dc numbers
     const dcinfo_t* info; // dclists_t doesn't own "info", just uses it for reference a lot
 };
 
-dclists_t* dclists_new(const dcinfo_t* info) {
+dclists_t* dclists_new(const dcinfo_t* info)
+{
     const unsigned num_dcs = dcinfo_get_count(info);
     uint8_t* deflist = xmalloc(num_dcs + 1);
-    for(unsigned i = 0; i < num_dcs; i++)
+    for (unsigned i = 0; i < num_dcs; i++)
         deflist[i] = i + 1;
     deflist[num_dcs] = 0;
 
-    dclists_t* newdcl = xmalloc(sizeof(dclists_t));
+    dclists_t* newdcl = xmalloc(sizeof(*newdcl));
     newdcl->count = 1;
     newdcl->old_count = 0;
-    newdcl->list = xmalloc(sizeof(uint8_t*));
+    newdcl->list = xmalloc(sizeof(*newdcl->list));
     newdcl->list[0] = deflist;
     newdcl->info = info;
 
     return newdcl;
 }
 
-dclists_t* dclists_clone(const dclists_t* old) {
-    dclists_t* dcl_clone = xmalloc(sizeof(dclists_t));
+dclists_t* dclists_clone(const dclists_t* old)
+{
+    dclists_t* dcl_clone = xmalloc(sizeof(*dcl_clone));
     dcl_clone->info = old->info;
     dcl_clone->count = old->count;
     dcl_clone->old_count = old->count;
-    dcl_clone->list = xmalloc(dcl_clone->count * sizeof(uint8_t*));
-    memcpy(dcl_clone->list, old->list, dcl_clone->count * sizeof(uint8_t*));
+    dcl_clone->list = xmalloc_n(dcl_clone->count, sizeof(*dcl_clone->list));
+    memcpy(dcl_clone->list, old->list, dcl_clone->count * sizeof(*dcl_clone->list));
     return dcl_clone;
 }
 
-unsigned dclists_get_count(const dclists_t* lists) {
-    dmn_assert(lists->count <= (DCLIST_MAX + 1U));
+unsigned dclists_get_count(const dclists_t* lists)
+{
+    gdnsd_assert(lists->count <= (DCLIST_MAX + 1U));
     return lists->count;
 }
 
-const uint8_t* dclists_get_list(const dclists_t* lists, const uint32_t idx) {
-    dmn_assert(idx < lists->count);
-    dmn_assert(idx <= DCLIST_MAX);
+const uint8_t* dclists_get_list(const dclists_t* lists, const uint32_t idx)
+{
+    gdnsd_assert(idx < lists->count);
+    gdnsd_assert(idx <= DCLIST_MAX);
     return lists->list[idx];
 }
 
@@ -112,42 +116,46 @@ const uint8_t* dclists_get_list(const dclists_t* lists, const uint32_t idx) {
 //  search for comparisons, and it could realloc the list by doubling instead of 1-at-a-time.
 // Not terribly worried about this unless someone complains first.
 F_NONNULL
-static uint32_t dclists_find_or_add_raw(dclists_t* lists, const uint8_t* newlist, const char* map_name) {
-    for(uint32_t i = 0; i < lists->count; i++)
-        if(!strcmp((const char*)newlist, (const char*)(lists->list[i])))
+static uint32_t dclists_find_or_add_raw(dclists_t* lists, const uint8_t* newlist, const char* map_name)
+{
+    for (uint32_t i = 0; i < lists->count; i++)
+        if (!strcmp((const char*)newlist, (const char*)(lists->list[i])))
             return i;
 
-    if(lists->count > DCLIST_MAX)
+    if (lists->count > DCLIST_MAX)
         log_fatal("plugin_geoip: map '%s': too many unique dclists (>%u)", map_name, lists->count);
 
     const uint32_t newidx = lists->count;
-    lists->list = xrealloc(lists->list, (++lists->count) * sizeof(uint8_t*));
-    lists->list[newidx] = (uint8_t*)strdup((const char*)newlist);
+    lists->count++;
+    lists->list = xrealloc_n(lists->list, lists->count, sizeof(*lists->list));
+    lists->list[newidx] = (uint8_t*)xstrdup((const char*)newlist);
 
-    dmn_assert(newidx <= DCLIST_MAX);
+    gdnsd_assert(newidx <= DCLIST_MAX);
     return newidx;
 }
 
 // replace the first (default) dclist...
-void dclists_replace_list0(dclists_t* lists, uint8_t* newlist) {
+void dclists_replace_list0(const dclists_t* lists, uint8_t* newlist)
+{
     free(lists->list[0]);
     lists->list[0] = newlist;
 }
 
 // We should probably check for dupes in these map dclists, but really the fallout
 //  is just some redundant lookup work if the user screws that up.
-bool dclists_xlate_vscf(dclists_t* lists, vscf_data_t* vscf_list, const char* map_name, uint8_t* newlist, const bool allow_auto) {
+bool dclists_xlate_vscf(const dclists_t* lists, vscf_data_t* vscf_list, const char* map_name, uint8_t* newlist, const bool allow_auto)
+{
     const unsigned count = vscf_array_get_len(vscf_list);
 
-    for(unsigned i = 0; i < count; i++) {
+    for (unsigned i = 0; i < count; i++) {
         vscf_data_t* dcname_cfg = vscf_array_get_data(vscf_list, i);
-        if(!dcname_cfg || !vscf_is_simple(dcname_cfg))
+        if (!dcname_cfg || !vscf_is_simple(dcname_cfg))
             log_fatal("plugin_geoip: map '%s': datacenter lists must be an array of one or more datacenter name strings", map_name);
         const char* dcname = vscf_simple_get_data(dcname_cfg);
-        if(count == 1 && allow_auto && !strcmp(dcname, "auto"))
+        if (count == 1 && allow_auto && !strcmp(dcname, "auto"))
             return true;
         const unsigned idx = dcinfo_name2num(lists->info, dcname);
-        if(!idx)
+        if (!idx)
             log_fatal("plugin_geoip: map '%s': datacenter name '%s' invalid ...", map_name, dcname);
         newlist[i] = idx;
     }
@@ -156,35 +164,45 @@ bool dclists_xlate_vscf(dclists_t* lists, vscf_data_t* vscf_list, const char* ma
     return false;
 }
 
-uint32_t dclists_find_or_add_vscf(dclists_t* lists, vscf_data_t* vscf_list, const char* map_name, const bool allow_auto) {
+uint32_t dclists_find_or_add_vscf(dclists_t* lists, vscf_data_t* vscf_list, const char* map_name, const bool allow_auto)
+{
     uint8_t newlist[256];
-    bool is_auto = dclists_xlate_vscf(lists,vscf_list,map_name,newlist,allow_auto);
-    if(is_auto) {
-        dmn_assert(allow_auto);
+    bool is_auto = dclists_xlate_vscf(lists, vscf_list, map_name, newlist, allow_auto);
+    if (is_auto) {
+        gdnsd_assert(allow_auto);
         return DCLIST_AUTO;
     }
     return dclists_find_or_add_raw(lists, newlist, map_name);
 }
 
-// Geographic distance between two lat/long points.
-// Because we only care about rough distance comparison rather than
-//  the precise values themselves, input is specified in radians
-//  and output in units of the earth's diameter.
+// "Distance" between two lat/long points.  Inputs should be pre-converted to
+// radians.  Because we only care about rough distance comparison between
+// outputs of this function for sorting purposes, it does not matter what the
+// output units are.  This is the haversine method, but we cut the calculation
+// short before the pointless (for our purposes) unit/arc conversions, and thus
+// the answer is in units of the square of half the chord length (intuitively,
+// sorting by chord or arc lengths would come out the same).
+// cos_dc_lat == cos(dc_lat), but the cos operation is precached since we'll
+// re-use the same DC coordinates here many times.
 F_CONST
-static double haversine(double lat1, double lon1, double lat2, double lon2) {
-    double a = pow(sin((lat2 - lat1) * 0.5), 2.0)
-        + cos(lat1) * cos(lat2) * pow(sin((lon2 - lon1) * 0.5), 2.0);
-    return atan2(sqrt(a), sqrt(1.0 - a));
+static double geodist(double lat, double lon, double dc_lat, double dc_lon, double cos_dc_lat)
+{
+    const double sin_half_dlat = sin((dc_lat - lat) * 0.5);
+    const double sin_half_dlon = sin((dc_lon - lon) * 0.5);
+    return sin_half_dlat * sin_half_dlat + cos(lat) * cos_dc_lat * sin_half_dlon * sin_half_dlon;
 }
 
-uint32_t dclists_city_auto_map(dclists_t* lists, const char* map_name, const double lat, const double lon) {
+uint32_t dclists_city_auto_map(dclists_t* lists, const char* map_name, const double lat, const double lon)
+{
     const double lat_rad = lat * DEG2RAD;
     const double lon_rad = lon * DEG2RAD;
 
     // Copy the default datacenter list to local storage for sorting
     const unsigned num_dcs = dcinfo_get_count(lists->info);
+    gdnsd_assert(num_dcs <= MAX_NUM_DCS);
+
     const unsigned store_len = num_dcs + 1;
-    uint8_t sortlist[store_len];
+    uint8_t sortlist[MAX_NUM_DCS + 1];
     memcpy(sortlist, lists->list[0], store_len);
 
     // calculate the target's distance from each datacenter.
@@ -192,21 +210,23 @@ uint32_t dclists_city_auto_map(dclists_t* lists, const char* map_name, const dou
     //  storage is offset by one.  This is so that the actual
     //  1-based dcnums in 'sortlist' can be used as direct
     //  indices into 'dists'
-    double dists[store_len];
-    for(unsigned i = 0; i < num_dcs; i++) {
-        const double* coords = dcinfo_get_coords(lists->info, i);
-        if (!isnan(coords[0]))
-            dists[i + 1] = haversine(lat_rad, lon_rad, coords[0], coords[1]);
+    double dists[MAX_NUM_DCS + 1];
+    for (unsigned i = 0; i < num_dcs; i++) {
+        const dcinfo_coords_t* coords = dcinfo_get_coords(lists->info, i);
+        GDNSD_DIAG_PUSH_IGNORED("-Wdouble-promotion")
+        if (!isnan(coords->lat))
+            dists[i + 1] = geodist(lat_rad, lon_rad, coords->lat, coords->lon, coords->cos_lat);
         else
-            dists[i + 1] = (double)+INFINITY;
+            dists[i + 1] = (double) + INFINITY;
+        GDNSD_DIAG_POP
     }
 
     // Given the relatively small num_dcs of most configs,
     //  this simple insertion sort is probably reasonably quick
-    for(unsigned i = 1; i < num_dcs; i++) {
+    for (unsigned i = 1; i < num_dcs; i++) {
         unsigned temp = sortlist[i];
         int j = (int)i - 1;
-        while(j >= 0 && (dists[temp] < dists[sortlist[j]])) {
+        while (j >= 0 && (dists[temp] < dists[sortlist[j]])) {
             sortlist[j + 1] = sortlist[j];
             j--;
         }
@@ -219,19 +239,22 @@ uint32_t dclists_city_auto_map(dclists_t* lists, const char* map_name, const dou
     return dclists_find_or_add_raw(lists, sortlist, map_name);
 }
 
-void dclists_destroy(dclists_t* lists, dclists_destroy_depth_t depth) {
-    switch(depth) {
-        case KILL_ALL_LISTS:
-            for(unsigned i = 0; i < lists->count; i++)
-                free(lists->list[i]);
-            break;
-        case KILL_NEW_LISTS:
-            for(unsigned i = lists->old_count; i < lists->count; i++)
-                free(lists->list[i]);
-            break;
-        case KILL_NO_LISTS:
-        default:
-            break;
+void dclists_destroy(dclists_t* lists, dclists_destroy_depth_t depth)
+{
+    switch (depth) {
+    case KILL_ALL_LISTS:
+        for (unsigned i = 0; i < lists->count; i++)
+            free(lists->list[i]);
+        break;
+    case KILL_NEW_LISTS:
+        for (unsigned i = lists->old_count; i < lists->count; i++)
+            free(lists->list[i]);
+        break;
+    case KILL_NO_LISTS:
+        // no-op
+        break;
+    default:
+        gdnsd_assert(0); // unreachable
     }
     free(lists->list);
     free(lists);

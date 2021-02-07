@@ -2,7 +2,7 @@
 
 use _GDT ();
 use File::Temp qw/tmpnam/;
-use Test::More tests => 8;
+use Test::More tests => 7;
 
 # We use dns_port_2 as a custom http listener
 #  for something to monitor
@@ -40,17 +40,11 @@ _GDT->test_dns(
 );
 
 _GDT->test_dns(
-    qname => 'addtl.example.com', qtype => 'MX',
-    answer => 'addtl.example.com 86400 MX 0 dyn.example.com',
-    addtl => 'dyn.example.com 100 A 127.0.0.1',
-);
-
-_GDT->test_dns(
     qname => 'ns1.example.com', qtype => 'A',
     answer => 'ns1.example.com 86400 A 192.0.2.254',
 );
 
 _GDT->test_kill_daemon($pid);
-_GDT->test_kill_daemon($http_pid);
+_GDT->test_kill_other_daemon($http_pid);
 
 END { kill(9, $http_pid) if($http_pid && kill(0, $http_pid)) }

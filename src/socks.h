@@ -20,23 +20,25 @@
 #ifndef GDNSD_SOCKS_H
 #define GDNSD_SOCKS_H
 
-#include <gdnsd/dmn.h>
+#include <gdnsd/net.h>
 #include <gdnsd/vscf.h>
 
 #include <stdbool.h>
 #include <pthread.h>
 
 typedef struct {
-    dmn_anysin_t addr;
-    bool autoscan;
+    gdnsd_anysin_t addr;
     unsigned dns_port;
-    unsigned udp_recv_width;
     unsigned udp_sndbuf;
     unsigned udp_rcvbuf;
     unsigned udp_threads;
     unsigned tcp_timeout;
+    unsigned tcp_fastopen;
     unsigned tcp_clients_per_thread;
+    unsigned tcp_backlog;
     unsigned tcp_threads;
+    bool     tcp_proxy;
+    bool     tcp_pad;
 } dns_addr_t;
 
 typedef struct {
@@ -45,41 +47,31 @@ typedef struct {
     unsigned threadnum;
     int sock;
     bool is_udp;
-    bool bind_success;
 } dns_thread_t;
 
 typedef struct {
-    dns_addr_t*    dns_addrs;
-    dns_thread_t*  dns_threads;
-    dmn_anysin_t*  http_addrs;
+    gdnsd_anysin_t addr;
+    bool chal_ok; // add/flush challenge data
+    bool ctl_ok;  // reload-zones, replace, stop
+} ctl_addr_t;
+
+typedef struct {
+    dns_addr_t* dns_addrs;
+    dns_thread_t* dns_threads;
+    ctl_addr_t* ctl_addrs;
     unsigned num_dns_addrs;
     unsigned num_dns_threads;
-    unsigned num_http_addrs;
-    unsigned http_timeout;
-    unsigned max_http_clients;
+    unsigned num_ctl_addrs;
+    unsigned long fd_estimate;
 } socks_cfg_t;
 
-// this is to be eliminated eventually, I think
-extern socks_cfg_t* scfg;
-
+F_RETNN
 socks_cfg_t* socks_conf_load(const vscf_data_t* cfg_root);
 
 F_NONNULL
 void socks_dns_lsocks_init(socks_cfg_t* socks_cfg);
 
 F_NONNULL
-bool socks_helper_bind(const char* desc, const int sock, const dmn_anysin_t* asin, bool no_freebind);
-
-// helper uses this (when told) to bind all sockets (calls above, indirectly in the statio case)
-void socks_helper_bind_all(void);
-
-F_NONNULL
-bool socks_sock_is_bound_to(const int sock, const dmn_anysin_t* addr);
-
-// daemon uses this to validate work done above
-// if soft: false retval means all succeeded, true retval means one or more failed
-// if !soft: will log_fatal() if any fail
-F_NONNULL
-bool socks_daemon_check_all(socks_cfg_t* socks_cfg, bool soft);
+void socks_bind_sock(const char* desc, const int sock, const gdnsd_anysin_t* sa);
 
 #endif // GDNSD_SOCKS_H

@@ -28,37 +28,37 @@
 #include <stdbool.h>
 #include <inttypes.h>
 
+typedef struct binstr_t {
+    const uint8_t* data;
+    unsigned len;
+} binstr_t;
+
 typedef struct {
-    const char*    username;
-    const uint8_t* chaos;
-    bool     weaker_security;
-    bool     include_optional_ns;
-    bool     realtime_stats;
+    binstr_t chaos;
+    binstr_t nsid;
+    const char*    cookie_key_file;
     bool     lock_mem;
     bool     disable_text_autosplit;
     bool     edns_client_subnet;
     bool     zones_strict_data;
-    bool     zones_strict_startup;
-    bool     zones_rfc1035_auto;
-    bool     any_mitigation;
-    int      priority;
-    unsigned chaos_len;
+    bool     disable_cookies;
+    bool     experimental_no_chain;
+    bool     disable_tcp_dso;
+    unsigned max_nocookie_response;
     unsigned zones_default_ttl;
     unsigned max_ncache_ttl;
     unsigned max_ttl;
     unsigned min_ttl;
-    unsigned log_stats;
-    unsigned max_response;
     unsigned max_edns_response;
-    unsigned max_cname_depth;
-    unsigned max_addtl_rrsets;
-    unsigned zones_rfc1035_auto_interval;
-    double zones_rfc1035_quiesce;
+    unsigned max_edns_response_v6;
+    unsigned acme_challenge_ttl;
+    unsigned acme_challenge_dns_ttl;
+    unsigned zones_rfc1035_threads;
 } cfg_t;
 
 extern const cfg_t* gcfg;
 
-F_NONNULLX(2)
-cfg_t* conf_load(const vscf_data_t* cfg_root, const socks_cfg_t* socks_cfg, const bool force_zss, const bool force_zsd);
+F_NONNULLX(2) F_RETNN
+cfg_t* conf_load(const vscf_data_t* cfg_root, const socks_cfg_t* socks_cfg, const bool force_zsd);
 
 #endif // GDNSD_CONF_H

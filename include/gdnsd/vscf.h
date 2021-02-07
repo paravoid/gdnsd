@@ -20,16 +20,15 @@
 #ifndef VSCF_H
 #define VSCF_H
 
+#include <gdnsd/compiler.h>
 #include <gdnsd/dname.h>
 
 #include <stdio.h>
 #include <stdbool.h>
 #include <sys/types.h>
 
-#pragma GCC visibility push(default)
-
 // Opaque data type used for all complex data pointers in the public API
-typedef union _vscf_data_t vscf_data_t;
+typedef union vscf_data_t vscf_data_t;
 
 // Used in hash sorting callbacks
 typedef struct {
@@ -38,7 +37,7 @@ typedef struct {
 } vscf_key_t;
 
 // Invokes the scanner, returning the root-level hash or array on success
-// On error, NULL is returned and the error is emitted with dmn_log_err()
+// On error, NULL is returned and the error is emitted with log_err()
 F_NONNULL
 vscf_data_t* vscf_scan_filename(const char* fn);
 
@@ -109,7 +108,7 @@ unsigned vscf_simple_get_len(vscf_data_t* d);
 // Also note that all simple strings get an extra NUL terminator
 //  one byte past the official end of string data.  For many cases
 //  this allows one to use them as NUL-terminated strings.
-F_NONNULL
+F_NONNULL F_RETNN
 const char* vscf_simple_get_data(vscf_data_t* d);
 
 // Return value indicates type-conversion success or failure (whether the
@@ -181,19 +180,19 @@ int vscf_hash_get_index_bykey(const vscf_data_t* d, const char* key, unsigned kl
  *  error.
  */
 typedef bool (*vscf_hash_iter_cb_t)(const char* key, unsigned klen, vscf_data_t* d, void* data);
-F_NONNULLX(1,3)
+F_NONNULLX(1, 3)
 void vscf_hash_iterate(const vscf_data_t* d, bool ignore_mark, vscf_hash_iter_cb_t f, void* data);
 
 // As above with a "const void*" for the data argument, to avoid dangerous const-casting
 typedef bool (*vscf_hash_iter_const_cb_t)(const char* key, unsigned klen, vscf_data_t* d, const void* data);
-F_NONNULLX(1,3)
+F_NONNULLX(1, 3)
 void vscf_hash_iterate_const(const vscf_data_t* d, bool ignore_mark, vscf_hash_iter_const_cb_t f, const void* data);
 
 // Re-sort hash keys from default order (order defined in config file) to an arbitrary
 //  order of your choosing, using a qsort()-like compare callback.  Calls to vscf_hash_iterate
 //  after vscf_hash_sort will iterate in the new sort order.  Not thread-safe (all access to
 //  a given hash should be locked if it's being sorted in a threaded environment).
-typedef int (*vscf_key_cmp_cb_t)(const vscf_key_t* const * const a, const vscf_key_t* const * const b);
+typedef int (*vscf_key_cmp_cb_t)(const vscf_key_t* const* const a, const vscf_key_t* const* const b);
 F_NONNULL
 void vscf_hash_sort(const vscf_data_t* d, vscf_key_cmp_cb_t f);
 
@@ -226,7 +225,7 @@ bool vscf_hash_add_val(const char* k, const unsigned klen, vscf_data_t* h, vscf_
 // deep-clone any type of data. detaches parent ptr at top.
 //  if ignore_marked is set, any hashes (recursively) will not
 //   copy marked items to the cloned copy.
-F_NONNULL
+F_NONNULL F_RETNN
 vscf_data_t* vscf_clone(const vscf_data_t* d, const bool ignore_marked);
 
 // "inherit" a key from src to dest.  If the key already exists in dest,
@@ -253,7 +252,5 @@ void vscf_hash_inherit_all(const vscf_data_t* src, vscf_data_t* dest, const bool
 // Obviously, it's easy to shoot yourself in the foot with this and cause strange results...
 F_NONNULL
 bool vscf_hash_bequeath_all(const vscf_data_t* src, const char* k, const bool mark_src, const bool skip_marked);
-
-#pragma GCC visibility pop
 
 #endif /* VSCF_H */

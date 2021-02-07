@@ -24,9 +24,9 @@ SKIPFILES="
 INCDIRS="
 -I.
 -Isrc
+-Isrc/plugins
 -Ilibgdnsd
 -Iinclude
--Iplugins
 -Ilibgdmaps
 -It/libtap
 -It/libgdmaps
@@ -44,7 +44,6 @@ DEFS="
 -DEPROTO=71
 -DSO_REUSEPORT=15
 -DTCP_DEFER_ACCEPT=9
--DRLIMIT_MEMLOCK=8
 -DIP_FREEBIND=15
 -DIP_MTU_DISCOVER=10
 -DIP_PMTUDISC_DONT=0
@@ -58,9 +57,8 @@ DEFS="
 -DIP_DONTFRAG=42
 -DIP_RECVDSTADDR=42
 -DIP_PKTINFO=8
--UPTHREAD_RWLOCK_WRITER_NONRECURSIVE_INITIALIZER_NP
--UDMN_COVERTEST_EXIT
--UDMN_NO_FATAL_COVERAGE
+-UGDNSD_COVERTEST_EXIT
+-UGDNSD_NO_FATAL_COVERAGE
 -UNDEBUG
 -D_CPPCHECK=1
 "
@@ -68,9 +66,10 @@ DEFS="
 set -x
 set -e
 
-for plat in unix64 unix32; do
-  cppcheck -j4 --platform=$plat --std=c99 --std=posix \
-    --enable=warning,performance,portability,information,style,missingInclude \
-    --inline-suppr --max-configs=999 --quiet --error-exitcode=42 \
-    $INCDIRS $SKIPFILES $DEFS .
-done
+# We used to check unix32 too, but it got complicated to get accurate reports
+# with code that depends on platform-specific config.h values, and I only tend
+# to run this when the local configuration is unix64
+cppcheck -j4 --platform=unix64 --std=c11 \
+  --enable=warning,performance,portability,information,style,missingInclude \
+  --inline-suppr --max-configs=999 --quiet --error-exitcode=42 \
+  $INCDIRS $SKIPFILES $DEFS .
