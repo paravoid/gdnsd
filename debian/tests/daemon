@@ -3,7 +3,9 @@
 set -e
 
 if pidof -x gdnsd > /dev/null; then
-    echo "OK"
+    echo "OK: gdnsd process running"
+    # the following exits non-zero if the daemon can't be reached
+    gdnsdctl status 2>&1
 else
     echo "ERROR: gdnsd is not running"
     exit 1
