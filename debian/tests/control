@@ -1,3 +1,7 @@
 Tests: daemon
-Depends: gdnsd
+Depends: @
+Restrictions: isolation-container, needs-root
+
+Tests: common-operations
+Depends: @, dnsutils 
 Restrictions: isolation-container, needs-root

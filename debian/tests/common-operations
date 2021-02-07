@@ -1,0 +1,49 @@
+#!/bin/sh
+
+set -e
+
+DIGOPTS="+short +timeout=1 +norec @127.0.0.1"
+
+if dig $DIGOPTS version.bind chaos | grep -q gdnsd; then
+    echo "OK: version check succeeded"
+else
+    echo "ERROR: version check failed"
+    exit 1
+fi
+
+cat > /etc/gdnsd/zones/example.org <<EOF
+@ 600	SOA	ns1 hostmaster 1 12H 2H 2W 600
+@	NS	ns1	; blank lines (empty or all whitespace) are ignored
+@       NS      ns2
+ns1	A	192.0.2.1 ; and single-line comments can end any line,
+ns2	A	192.0.2.2
+mail	A	192.0.2.3
+EOF
+echo "INFO: zone file written"
+
+# the following exits non-zero if the daemon can't be reached
+gdnsdctl reload-zones 2>&1
+echo "OK: gdnsdctl reload-zones succeeded"
+
+if [ `dig $DIGOPTS mail.example.org` = "192.0.2.3" ]; then
+    echo "OK: query succeeded"
+else
+    echo "ERROR: mail.example.org query failed"
+    exit 1
+fi
+
+cat > /etc/gdnsd/config <<EOF
+options => {
+    dns_port => 5353,
+}
+EOF
+
+gdnsdctl replace 2>&1
+echo "OK: gdnsdctl replace succeeded"
+
+if dig $DIGOPTS -p 5353 example.org NS | grep -q ns1; then
+    echo "OK: query succeeded"
+else
+    echo "ERROR: example.org NS query failed"
+    exit 1
+fi
