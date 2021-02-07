@@ -1,0 +1,10 @@
+#!/bin/sh
+
+# replicate and simplify the logic from t/Makefile.am
+# to avoid having to run autoreconf, ./configure, etc.
+export INSTALLCHECK_SBINDIR=/usr/sbin
+export INSTALLCHECK_BINDIR=/usr/bin
+export TESTOUT_DIR=$AUTOPKGTEST_TMP
+export TESTPORT_START=12345
+
+prove -v -f --merge -j4 --norc -It/ t/[0-9]*/*.t
