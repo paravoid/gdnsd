@@ -12,4 +12,24 @@ fi
 
 #DEBHELPER#
 
+# Override dh_installsystemd's default here, to be able to perfom zero downtime
+# upgrades (i.e. without restarting the daemon) on >= 3.x. We'd ideally want to
+# use something like a --reload-after-upgrade option, but this is not supported
+# yet. See debhelper MR #14 and Debian #892958 for an eventual implementation.
+if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ] || [ "$1" = "abort-deconfigure" ] || [ "$1" = "abort-remove" ] ; then
+	if [ -d /run/systemd/system ]; then
+		systemctl --system daemon-reload >/dev/null || true
+		if [ -n "$2" ]; then
+			if systemctl --quiet is-active gdnsd && echo "$2" | grep -vq '^[1-2]\.'; then
+				_dh_action=reload-or-restart
+			else
+				_dh_action=restart
+			fi
+		else
+			_dh_action=start
+		fi
+		deb-systemd-invoke $_dh_action 'gdnsd.service' >/dev/null || true
+	fi
+fi
+
 exit 0
