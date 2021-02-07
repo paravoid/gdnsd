@@ -1,3 +1,55 @@
+gdnsd (3.5.0-1) unstable; urgency=medium
+
+  * New major upstream release.
+    - Fixes CVE-2019-13952. (Closes: #932407)
+    - Plugins cannot be built externally anymore; drop the gdnsd-dev package.
+    - Add new build dependency on libsodium-dev.
+    - Add build dependency on libnet-dns-perl and drop the embedded copy.
+    - Drop build dependency on libwww-perl, not needed anymore.
+    - Add new copyright stanza for src/kdf_compat.c.
+    - Remove lib* plugins, everything is in /usr/sbin/gdnsd now.
+    - Add lintian-override for gdnsd-plugin-* manpages.
+    - Ship new binary /usr/bin/gdnsdctl.
+  * Support zero downtime upgrades: add code to postinst to allow upgrades to
+    happen with a native binary replace, rather than a stop/start. This only
+    applies for upgrades from here on; an upgrade from 2.x will require a
+    restart.
+  * Update Standards-Version to 4.5.1.
+  * Bump debhelper compat to 13.
+  * Remove versioned depends on libmaxminddb-dev, as minimum version is now
+    satisfied in oldstable.
+  * Use upstream Makefile to install all files, rather than installing to
+    debian/tmp and cherry-picking files to the (now sole) gdnsd binary
+    package.
+  * Drop our own copy of the systemd service and use upstream's instead.
+  * Switch runtime directory from /var/run to /run.
+  * Remove SysV init script: due to upstream changes, running with an init
+    script requires a significant extra effort and additional dependencies.
+    Thus, and per the 2019 init systems GR, support only systems with systemd
+    as their init system.
+  * Add --with-systemdsystemunitdir to configure, to avoid extra build
+    dependencies on systemd and pkg-config.
+  * Support building without (fake)root (Rules-Requires-Root: no).
+  * Add support for the "nocheck" build profile, that skips the installation
+    of the Perl build dependencies and the execution of the suite itself.
+  * Add more autopkgtests:
+    - Add "isolation-container" to the "daemon" test, due to the network port.
+    - Enhance the existing, simple "daemon" test to also run gdnsdctl.
+    - Add a "common-operations" test, that uses "dig" to resolve hostnames,
+      and validates that "gdnsdctl reload-zones" and "gdnsdctl replace" work.
+    - Add a "testsuite" test, that runs the upstream test suite against the
+      installed binary.
+  * Update debian/copyright:
+    - Adjust years to include up to 2021.
+    - Point to GPL-3, not GPL (copyright-refers-to-symlink-license).
+  * Add upstream metadata.
+  * Update a couple of links to https (from http).
+  * Update debian/watch to v4.
+  * Drop "unapply-patches" from debian/source/local-options.
+  * Update git layout and gbp.conf for a DEP-14/"gbp import-orig" workflow.
+
+ -- Faidon Liambotis <paravoid@debian.org>  Sun, 07 Feb 2021 09:50:53 +0200
+
 gdnsd (2.4.2-1) unstable; urgency=medium
 
   * New upstream point release.
