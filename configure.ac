@@ -1,5 +1,5 @@
 AC_PREREQ([2.64])
-AC_INIT([gdnsd],[3.5.0],[https://github.com/gdnsd/gdnsd/issues],[gdnsd],[https://gdnsd.org])
+AC_INIT([gdnsd],[3.5.1],[https://github.com/gdnsd/gdnsd/issues],[gdnsd],[https://gdnsd.org])
 AC_CONFIG_SRCDIR([src/main.c])
 AC_CONFIG_AUX_DIR([acaux])
 AM_INIT_AUTOMAKE([1.13 dist-xz no-dist-gzip foreign tar-ustar subdir-objects -Wall])
@@ -335,9 +335,13 @@ AC_DEFINE_UNQUOTED([BUILD_FEATURES], ["$B_FEAT"], [Build Features])
 
 # BUILD_INFO for cmdline output
 B_INFO=non-git
-if test -d ${srcdir}/${GIT_DIR:-.git} -o -f ${srcdir}/.git; then
-    [B_INFO=`cd ${srcdir}; git describe --match 'v[0-9]*' --always --dirty`]
-fi
+AC_ARG_WITH([buildinfo],[AS_HELP_STRING([--with-buildinfo=v1.2.3-4],
+    [Overrides the "Build Info" string which is output by CLI tools and normally contains version info derived directly from a git checkout])],
+    [B_INFO=$with_buildinfo],
+    [if test -d ${srcdir}/${GIT_DIR:-.git} -o -f ${srcdir}/.git; then
+        [B_INFO=`cd ${srcdir}; git describe --match 'v[0-9]*' --always --dirty`]
+    fi]
+)
 AC_DEFINE_UNQUOTED([BUILD_INFO],["$B_INFO"],[Build Info])
 
 werror=0

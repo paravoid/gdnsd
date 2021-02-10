@@ -263,8 +263,30 @@ static unsigned get_pgsz(void)
 // think it works for the *BSDs as well.
 #define CMSG_BUFSIZE CMSG_SPACE(sizeof(struct in6_pktinfo))
 
+// Clear the ipi6_ifindex value of an IPV6_PKTINFO unless the address is
+// link-local.  Leaving it set to its original value in other cases can cause
+// mis-routing of responses (e.g. receiving a request packet through a real
+// interface, with a global unicast destination address which is configured
+// only on the local loopback interface, as is common behind certain kinds of
+// loadbalancer/router setups).
+F_NONNULL
+static void ipv6_pktinfo_ifindex_fixup(struct msghdr* msg_hdr)
+{
+    gdnsd_assert(((struct sockaddr*)msg_hdr->msg_name)->sa_family == AF_INET6);
+    struct cmsghdr* cmsg = (struct cmsghdr*)CMSG_FIRSTHDR(msg_hdr);
+    while (cmsg) {
+        if ((cmsg->cmsg_level == IPPROTO_IPV6) && (cmsg->cmsg_type == IPV6_PKTINFO)) {
+            struct in6_pktinfo* pi = (void*)CMSG_DATA(cmsg);
+            if (!IN6_IS_ADDR_LINKLOCAL(&pi->ipi6_addr))
+                pi->ipi6_ifindex = 0;
+            break;
+        }
+        cmsg = (struct cmsghdr*)CMSG_NXTHDR(msg_hdr, cmsg);
+    }
+}
+
 F_HOT F_NONNULL
-static void process_msg(const int fd, dnsp_ctx_t* pctx, dnspacket_stats_t* stats, const struct msghdr* msg_hdr, ssize_t recvmsg_rv)
+static void process_msg(const int fd, dnsp_ctx_t* pctx, dnspacket_stats_t* stats, struct msghdr* msg_hdr, ssize_t recvmsg_rv)
 {
     if (unlikely(recvmsg_rv < 0)) {
         log_neterr("UDP recvmsg() error: %s", logf_errno());
@@ -281,20 +303,8 @@ static void process_msg(const int fd, dnsp_ctx_t* pctx, dnspacket_stats_t* stats
         return;
     }
 
-#if defined __FreeBSD__ && defined IPV6_PKTINFO
-    if (sa->sa.sa_family == AF_INET6) {
-        struct cmsghdr* cmsg;
-        for (cmsg = (struct cmsghdr*)CMSG_FIRSTHDR(msg_hdr); cmsg;
-                cmsg = (struct cmsghdr*)CMSG_NXTHDR(msg_hdr, cmsg)) {
-            if ((cmsg->cmsg_level == IPPROTO_IPV6) && (cmsg->cmsg_type == IPV6_PKTINFO)) {
-                struct in6_pktinfo* pi = (void*)CMSG_DATA(cmsg);
-                if (!IN6_IS_ADDR_LINKLOCAL(&pi->ipi6_addr))
-                    pi->ipi6_ifindex = 0;
-                continue;
-            }
-        }
-    }
-#endif
+    if (sa->sa.sa_family == AF_INET6)
+        ipv6_pktinfo_ifindex_fixup(msg_hdr);
 
     size_t buf_in_len = (size_t)recvmsg_rv;
     sa->len = msg_hdr->msg_namelen;
@@ -315,7 +325,7 @@ static void process_msg(const int fd, dnsp_ctx_t* pctx, dnspacket_stats_t* stats
 }
 
 F_HOT F_NONNULL
-static void mainloop(const int fd, dnsp_ctx_t* pctx, dnspacket_stats_t* stats)
+static void mainloop(const int fd, dnsp_ctx_t* pctx, dnspacket_stats_t* stats, const bool use_cmsg)
 {
     const unsigned pgsz = get_pgsz();
     const unsigned max_rounded = ((MAX_RESPONSE_BUF + pgsz - 1) / pgsz) * pgsz;
@@ -335,7 +345,7 @@ static void mainloop(const int fd, dnsp_ctx_t* pctx, dnspacket_stats_t* stats)
     msg_hdr.msg_name       = &sa.sa;
     msg_hdr.msg_iov        = &iov;
     msg_hdr.msg_iovlen     = 1;
-    msg_hdr.msg_control    = cmsg_buf.cbuf;
+    msg_hdr.msg_control    = use_cmsg ? cmsg_buf.cbuf : NULL;
 
     const struct timeval tmout_long  = { .tv_sec = MAX_SHUTDOWN_DELAY_S, .tv_usec = MAX_PRCU_DELAY_US };
     const struct timeval tmout_short = { .tv_sec = 0, .tv_usec = MAX_PRCU_DELAY_US };
@@ -345,10 +355,12 @@ static void mainloop(const int fd, dnsp_ctx_t* pctx, dnspacket_stats_t* stats)
 
     while (likely(!thread_shutdown)) {
         iov.iov_len = DNS_RECV_SIZE;
-        msg_hdr.msg_controllen = CMSG_BUFSIZE;
         msg_hdr.msg_namelen    = GDNSD_ANYSIN_MAXLEN;
         msg_hdr.msg_flags      = 0;
-        memset(cmsg_buf.cbuf, 0, sizeof(cmsg_buf));
+        if (use_cmsg) {
+            msg_hdr.msg_controllen = CMSG_BUFSIZE;
+            memset(cmsg_buf.cbuf, 0, sizeof(cmsg_buf));
+        }
 
         ssize_t recvmsg_rv;
 
@@ -396,21 +408,8 @@ static void process_mmsgs(const int fd, dnsp_ctx_t* pctx, dnspacket_stats_t* sta
     gdnsd_assert(pkts <= MMSG_WIDTH);
     for (unsigned i = 0; i < pkts; i++) {
         gdnsd_anysin_t* asp = dgrams[i].msg_hdr.msg_name;
-#if defined __FreeBSD__ && defined IPV6_PKTINFO
-        if (asp->sa.sa_family == AF_INET6) {
-            struct msghdr* mhdr = &dgrams[i].msg_hdr;
-            struct cmsghdr* cmsg;
-            for (cmsg = (struct cmsghdr*)CMSG_FIRSTHDR(mhdr); cmsg;
-                    cmsg = (struct cmsghdr*)CMSG_NXTHDR(mhdr, cmsg)) {
-                if ((cmsg->cmsg_level == IPPROTO_IPV6) && (cmsg->cmsg_type == IPV6_PKTINFO)) {
-                    struct in6_pktinfo* pi = (void*)CMSG_DATA(cmsg);
-                    if (!IN6_IS_ADDR_LINKLOCAL(&pi->ipi6_addr))
-                        pi->ipi6_ifindex = 0;
-                    continue;
-                }
-            }
-        }
-#endif
+        if (asp->sa.sa_family == AF_INET6)
+            ipv6_pktinfo_ifindex_fixup(&dgrams[i].msg_hdr);
         struct iovec* iop = &dgrams[i].msg_hdr.msg_iov[0];
         if (unlikely((asp->sa.sa_family == AF_INET && !asp->sin4.sin_port)
                      || (asp->sa.sa_family == AF_INET6 && !asp->sin6.sin6_port))) {
@@ -469,7 +468,7 @@ static void process_mmsgs(const int fd, dnsp_ctx_t* pctx, dnspacket_stats_t* sta
 }
 
 F_HOT F_NONNULL
-static void mainloop_mmsg(const int fd, dnsp_ctx_t* pctx, dnspacket_stats_t* stats)
+static void mainloop_mmsg(const int fd, dnsp_ctx_t* pctx, dnspacket_stats_t* stats, const bool use_cmsg)
 {
     // MAX_RESPONSE_BUF, rounded up to the next nearest multiple of the page size
     const unsigned pgsz = get_pgsz();
@@ -494,7 +493,7 @@ static void mainloop_mmsg(const int fd, dnsp_ctx_t* pctx, dnspacket_stats_t* sta
         dgrams[i].msg_hdr.msg_iov        = msgdata[i].iov;
         dgrams[i].msg_hdr.msg_iovlen     = 1;
         dgrams[i].msg_hdr.msg_name       = &msgdata[i].sa.sa;
-        dgrams[i].msg_hdr.msg_control    = msgdata[i].cmsg_buf.cbuf;
+        dgrams[i].msg_hdr.msg_control    = use_cmsg ? msgdata[i].cmsg_buf.cbuf : NULL;
     }
 
     const struct timeval tmout_long  = { .tv_sec = MAX_SHUTDOWN_DELAY_S, .tv_usec = MAX_PRCU_DELAY_US };
@@ -508,9 +507,11 @@ static void mainloop_mmsg(const int fd, dnsp_ctx_t* pctx, dnspacket_stats_t* sta
         for (unsigned i = 0; i < MMSG_WIDTH; i++) {
             dgrams[i].msg_hdr.msg_iov[0].iov_len = DNS_RECV_SIZE;
             dgrams[i].msg_hdr.msg_namelen        = GDNSD_ANYSIN_MAXLEN;
-            dgrams[i].msg_hdr.msg_controllen     = CMSG_BUFSIZE;
             dgrams[i].msg_hdr.msg_flags          = 0;
-            memset(msgdata[i].cmsg_buf.cbuf, 0, sizeof(msgdata[i].cmsg_buf));
+            if (use_cmsg) {
+                dgrams[i].msg_hdr.msg_controllen = CMSG_BUFSIZE;
+                memset(msgdata[i].cmsg_buf.cbuf, 0, sizeof(msgdata[i].cmsg_buf));
+            }
         }
 
         int mmsg_rv;
@@ -576,12 +577,16 @@ void* dnsio_udp_start(void* thread_asvoid)
 
     rcu_register_thread();
 
+    const bool use_cmsg = addrconf->addr.sa.sa_family == AF_INET6
+                          ? true
+                          : gdnsd_anysin_is_anyaddr(&addrconf->addr);
+
 #ifdef USE_MMSG
     if (use_mmsg)
-        mainloop_mmsg(t->sock, pctx, stats);
+        mainloop_mmsg(t->sock, pctx, stats, use_cmsg);
     else
 #endif
-        mainloop(t->sock, pctx, stats);
+        mainloop(t->sock, pctx, stats, use_cmsg);
 
     rcu_unregister_thread();
     dnspacket_ctx_cleanup(pctx);
