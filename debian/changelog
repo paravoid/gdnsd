@@ -1,3 +1,9 @@
+gdnsd (3.5.1-1) unstable; urgency=medium
+
+  * New upstream release.
+
+ -- Faidon Liambotis <paravoid@debian.org>  Thu, 11 Feb 2021 00:29:52 +0200
+
 gdnsd (3.5.0-1) unstable; urgency=medium
 
   * New major upstream release.
