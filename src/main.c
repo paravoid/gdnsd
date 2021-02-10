@@ -429,7 +429,7 @@ static void try_raise_open_files(const socks_cfg_t* socks_cfg)
     // there can be parallel threads) and/or geoip database needs and other
     // miscellaneous bits.  It should at least get us in the ballpark.
 
-    rlim_t files_desired = socks_cfg->fd_estimate + 100U;
+    rlim_t files_desired = (rlim_t)(socks_cfg->fd_estimate + 100U);
 
     struct rlimit rlim;
     if (getrlimit(RLIMIT_NOFILE, &rlim)) {
@@ -470,7 +470,7 @@ static css_t* runtime_execute(const char* argv0, socks_cfg_t* socks_cfg, css_t* 
 
     // Lock whole daemon into memory, including all future allocations.
     if (gcfg->lock_mem && mlockall(MCL_CURRENT | MCL_FUTURE))
-        log_fatal("mlockall(MCL_CURRENT|MCL_FUTURE) failed: %s (you may need to disabled the lock_mem config option if your system or your ulimits do not allow it)", logf_errno());
+        log_fatal("mlockall(MCL_CURRENT | MCL_FUTURE) failed: %s (you may need to disable the lock_mem config option if your system or your ulimits do not allow it)", logf_errno());
 
     // init cookie support and load key, if any
     if (!gcfg->disable_cookies)
