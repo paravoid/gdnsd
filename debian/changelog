@@ -1,3 +1,11 @@
+gdnsd (2.4.3-1) buster; urgency=medium
+
+  * Fix CVE-2019-13952: IPv6 addresses in local zone file data which are
+    longer than the maximum legitimate IPv6 address cause a stack buffer
+    overflow and crash. (Closes: #932407)
+
+ -- Faidon Liambotis <paravoid@debian.org>  Thu, 11 Feb 2021 23:58:20 +0200
+
 gdnsd (2.4.2-1) unstable; urgency=medium
 
   * New upstream point release.
