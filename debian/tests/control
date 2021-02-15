@@ -3,7 +3,7 @@ Depends: @
 Restrictions: isolation-container, needs-root
 
 Tests: common-operations
-Depends: @, dnsutils 
+Depends: @, bind9-dnsutils
 Restrictions: isolation-container, needs-root
 
 Tests: testsuite
