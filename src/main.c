@@ -328,7 +328,7 @@ static void do_tak2(struct ev_loop* loop, const csc_t* csc)
             log_fatal("REPLACE[new daemon]: takeover phase 2 notification attempt failed");
         const size_t chal_count = csbuf_get_v(&resp);
         const size_t chal_dlen = resp.d;
-        log_devdebug("TAK1 challenge handoff got count %zu dlen %zu", chal_count, chal_dlen);
+        log_devdebug("TAK2 challenge handoff got count %zu dlen %zu", chal_count, chal_dlen);
         size_t offset = 0;
         for (size_t i = 0; i < chal_count; i++) {
             if (offset + 5U > chal_dlen)
@@ -576,16 +576,16 @@ static css_t* runtime_execute(const char* argv0, socks_cfg_t* socks_cfg, css_t* 
     // wait for i/o threads to exit
     wait_io_threads_stop(socks_cfg);
 
-    // deallocate resources
-    atexit_execute();
-
     // If we were replaced, this sends a final dump of stats to the new daemon
     // for stats counter continuity
     css_send_stats_handoff(css);
 
-    // We delete this last, because in the case of "gdnsdctl stop" or "gdnsdctl
-    // replace" this is where the active connection to gdnsdctl will be broken,
-    // sending it into a loop waiting on our PID to cease existing.
+    // deallocate resources
+    atexit_execute();
+
+    // We delete this last, because it will break connections with random
+    // control socket clients, who may then try to reconnect, and in the case
+    // of replace should quickly get connected to the new daemon from here.
     css_delete(css);
 
     // Stop the terminal signal handlers very late in the game.  Any terminal
@@ -671,7 +671,7 @@ int main(int argc, char** argv)
             }
             if (!copts.replace_ok)
                 log_fatal("Another instance is running and has the control socket locked, failing");
-            csc = csc_new(13, "REPLACE[new daemon]: ", NULL);
+            csc = csc_new(37U, "REPLACE[new daemon]: ", NULL);
             if (!csc)
                 log_fatal("Another daemon appears to be running, but cannot establish a connection to its control socket for takeover, exiting!");
             do_tak1(csc);

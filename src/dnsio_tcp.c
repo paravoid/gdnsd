@@ -64,8 +64,8 @@
 // efficiency hack of course.
 #define TCP_READBUF 3840U
 #if __STDC_VERSION__ >= 201112L // C11
-static_assert(TCP_READBUF >= (DNS_RECV_SIZE + 2U), "TCP readbuf fits >= 1 maximal req");
-static_assert(TCP_READBUF >= sizeof(proxy_hdr_t), "TCP readbuf >= PROXY header");
+_Static_assert(TCP_READBUF >= (DNS_RECV_SIZE + 2U), "TCP readbuf fits >= 1 maximal req");
+_Static_assert(TCP_READBUF >= sizeof(proxy_hdr_t), "TCP readbuf >= PROXY header");
 #endif
 
 typedef union {
@@ -80,7 +80,7 @@ typedef union {
 
 // Ensure no padding between pktbuf_size_hdr and pkt, above
 #if __STDC_VERSION__ >= 201112L // C11
-static_assert(_Alignof(pkt_t) <= _Alignof(uint16_t), "No padding for pkt");
+_Static_assert(_Alignof(pkt_t) <= _Alignof(uint16_t), "No padding for pkt");
 #endif
 
 typedef enum {
@@ -141,7 +141,7 @@ struct conn {
 
 // See above at definition of TCP_READBUF
 #if __STDC_VERSION__ >= 201112L // C11
-static_assert(sizeof(conn_t) <= 4096U, "TCP conn <= 4KB");
+_Static_assert(sizeof(conn_t) <= 4096U, "TCP conn <= 4KB");
 #endif
 
 static pthread_mutex_t registry_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -157,12 +157,16 @@ void dnsio_tcp_init(size_t num_threads)
 
 void dnsio_tcp_request_threads_stop(void)
 {
+    pthread_mutex_lock(&registry_lock);
     gdnsd_assert(registry_size == registry_init);
     for (size_t i = 0; i < registry_init; i++) {
         thread_t* thr = registry[i];
-        ev_async* stop_watcher = &thr->stop_watcher;
-        ev_async_send(thr->loop, stop_watcher);
+        if (thr) {
+            ev_async* stop_watcher = &thr->stop_watcher;
+            ev_async_send(thr->loop, stop_watcher);
+        }
     }
+    pthread_mutex_unlock(&registry_lock);
 }
 
 F_NONNULL
@@ -171,6 +175,19 @@ static void register_thread(thread_t* thr)
     pthread_mutex_lock(&registry_lock);
     gdnsd_assert(registry_init < registry_size);
     registry[registry_init++] = thr;
+    pthread_mutex_unlock(&registry_lock);
+}
+
+F_NONNULL
+static void unregister_thread(const thread_t* thr)
+{
+    pthread_mutex_lock(&registry_lock);
+    for (unsigned i = 0; i < registry_init; i++) {
+        if (registry[i] == thr) {
+            registry[i] = NULL;
+            break;
+        }
+    }
     pthread_mutex_unlock(&registry_lock);
 }
 
@@ -962,7 +979,6 @@ void tcp_dns_listen_setup(dns_thread_t* t)
     gdnsd_assert(addrconf);
 
     const gdnsd_anysin_t* sa = &addrconf->addr;
-    gdnsd_assert(sa);
 
     const bool isv6 = sa->sa.sa_family == AF_INET6 ? true : false;
     gdnsd_assert(isv6 || sa->sa.sa_family == AF_INET);
@@ -1147,6 +1163,7 @@ void* dnsio_tcp_start(void* thread_asvoid)
 
     rcu_unregister_thread();
 
+    unregister_thread(thr);
     ev_loop_destroy(loop);
     dnspacket_ctx_cleanup(thr->pctx);
     for (unsigned i = 0; i < thr->churn_count; i++)
