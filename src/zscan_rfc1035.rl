@@ -326,7 +326,7 @@ static bool zscan_do(zone_t* zone, const uint8_t* origin, const char* fn, const 
 /********** TXT ******************/
 
 F_NONNULL
-static void text_start(zscan_t* z)
+static void text_start(zscan_t* z V_UNUSED)
 {
     gdnsd_assert(z->text == NULL);
     gdnsd_assert(z->text_len == 0);
@@ -759,7 +759,7 @@ bool zscan_rfc1035(zone_t* zone, const char* fn)
 
 #define preproc_err(_msg) \
     do {\
-        log_err("rfc1035: Zone %s: Zonefile preprocessing error at file %s line %lu: " _msg, logf_dname(z->zone->dname), z->curfn, line_num);\
+        log_err("rfc1035: Zone %s: Zonefile preprocessing error at file %s line %zu: " _msg, logf_dname(z->zone->dname), z->curfn, line_num);\
         siglongjmp(z->jbuf, 1);\
     } while (0)
 

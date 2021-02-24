@@ -207,8 +207,8 @@ static void css_conn_write_data(css_conn_t* c)
     gdnsd_assert(c->state == WRITING_RESP_DATA);
     gdnsd_assert(c->data);
     gdnsd_assert(c->size);
+    gdnsd_assert(c->size > c->size_done);
     const size_t wanted = c->size - c->size_done;
-    gdnsd_assert(wanted > 0);
     const ssize_t pktlen = send(c->fd, &c->data[c->size_done], wanted, MSG_DONTWAIT);
     if (pktlen < 0) {
         if (ERRNO_WOULDBLOCK)
@@ -249,6 +249,7 @@ static bool css_conn_write_resp(css_conn_t* c)
 
     size_t send_fd_count = SCM_MAX_FDS;
     if (c->state == WRITING_RESP_FDS) {
+        gdnsd_assert(c->size > c->size_done);
         const size_t fd_todo = c->size - c->size_done;
         if (fd_todo < SCM_MAX_FDS)
             send_fd_count = fd_todo;
@@ -317,7 +318,7 @@ static void respond(css_conn_t* c, const char key, const uint32_t v, const uint3
     gdnsd_assert(c->css);
     gdnsd_assert(c->state == WAITING_SERVER);
     gdnsd_assert(v <= 0xFFFFFF);
-    gdnsd_assert(!(data && send_fds)); // we don't support setting both
+    gdnsd_assert(!data || !send_fds); // we don't support setting both
 
     c->wbuf.key = key;
     csbuf_set_v(&c->wbuf, v);
@@ -431,7 +432,7 @@ static pid_t spawn_replacement(const char* argv0)
 
     int pipefd[2];
     if (pipe2(pipefd, O_CLOEXEC))
-        log_fatal("pipe() failed: %s", logf_errno());
+        log_fatal("pipe2(O_CLOEXEC) failed: %s", logf_errno());
 
     pid_t middle_pid = fork();
     if (middle_pid == -1)
@@ -511,9 +512,8 @@ static void recv_challenge_data(struct ev_loop* loop, ev_io* w, css_conn_t* c, c
 {
     gdnsd_assert(c->data);
     gdnsd_assert(c->size);
+    gdnsd_assert(c->size > c->size_done);
     size_t wanted = c->size - c->size_done;
-    gdnsd_assert(wanted > 0);
-
     ssize_t pktlen = recv(c->fd, &c->data[c->size_done], wanted, MSG_DONTWAIT);
     if (pktlen <= 0) {
         if (pktlen < 0 && ERRNO_WOULDBLOCK)
@@ -534,7 +534,7 @@ static void recv_challenge_data(struct ev_loop* loop, ev_io* w, css_conn_t* c, c
 
         char resp_key = RESP_ACK;
         if (css->replacement_pid) {
-            log_info("Deferring acme-dns-01 request while replace in progress");
+            log_info("REPLACE[old daemon]: Deferring a new acme-dns-01 request while replace in progress");
             resp_key = RESP_LATR;
         } else if (cset_create(loop, 0, csbuf_get_v(&c->rbuf), c->size_done, (uint8_t*)c->data)) {
             resp_key = RESP_FAIL;
@@ -553,7 +553,7 @@ static void handle_req_stop(css_conn_t* c, css_t* css)
 {
     if (css->replacement_pid) {
         if (c != css->replace_conn_dmn) {
-            log_info("Deferring stop request while replace in progress");
+            log_info("REPLACE[old daemon]: Deferring a new stop request while replace in progress");
             respond(c, RESP_LATR, 0, 0, NULL, false);
             return;
         } else {
@@ -598,7 +598,7 @@ F_NONNULL
 static void handle_req_zrel(css_conn_t* c, css_t* css)
 {
     if (css->replacement_pid) {
-        log_info("Deferring reload-zones request while replace in progress");
+        log_info("REPLACE[old daemon]: Deferring a new reload-zones request while replace in progress");
         respond(c, RESP_LATR, 0, 0, NULL, false);
         return;
     }
@@ -613,7 +613,7 @@ F_NONNULL
 static void handle_req_repl(css_conn_t* c, css_t* css)
 {
     if (css->replacement_pid) {
-        log_info("Deferring replace request while another replace already in progress");
+        log_info("REPLACE[old daemon]: Deferring a new replace request while another replace already in progress");
         respond(c, RESP_LATR, 0, 0, NULL, false);
         return;
     }
@@ -633,12 +633,12 @@ static void handle_req_tak1(css_conn_t* c, css_t* css)
 {
     const pid_t take_pid = (pid_t)c->rbuf.d;
     if (css->replacement_pid && css->replacement_pid != take_pid) {
-        log_warn("Denying takeover notification from PID %li while replace is already in progress with PID %li", (long)take_pid, (long)css->replacement_pid);
+        log_warn("REPLACE[old daemon]: Denying takeover notification from PID %li while replace is already in progress with PID %li", (long)take_pid, (long)css->replacement_pid);
         // could argue for LATR or FAIL here, but currently the new daemon doesn't wait and retry anyways
         respond(c, RESP_LATR, 0, 0, NULL, false);
         return;
     }
-    log_debug("Accepted takeover notification from PID %li", (long)take_pid);
+    log_debug("REPLACE[old daemon]: Accepted takeover notification from PID %li", (long)take_pid);
     css->replacement_pid = take_pid;
     gdnsd_assert(!css->replace_conn_dmn);
     css->replace_conn_dmn = c;
@@ -648,16 +648,28 @@ static void handle_req_tak1(css_conn_t* c, css_t* css)
     respond(c, RESP_ACK, 0, 0, NULL, false);
 }
 
+// Common 3-way logging function for the next two handlers
+static void log_illegal_takeover(const char phase, const long take_pid, const long repl_pid)
+{
+    if (!repl_pid)
+        log_warn("REPLACE[old daemon]: Denying illegal takeover phase %c from PID %li without pre-notification", phase, take_pid);
+    else if (take_pid != repl_pid)
+        log_warn("REPLACE[old daemon]: Denying illegal takeover phase %c from PID %li while replace is already in progress with PID %li", phase, take_pid, repl_pid);
+    else
+        log_warn("REPLACE[old daemon]: Denying illegal takeover phase %c from PID %li which did not arrive on the existing takeover socket", phase, take_pid);
+}
+
 F_NONNULL
 static void handle_req_tak2(css_conn_t* c, const css_t* css)
 {
     const pid_t take_pid = (pid_t)c->rbuf.d;
     if (!css->replacement_pid || take_pid != css->replacement_pid || c != css->replace_conn_dmn) {
-        log_warn("Denying illegal takeover phase 2 from PID %li while replace is already in progress with PID %li", (long)take_pid, (long)css->replacement_pid);
+        log_illegal_takeover('2', (long)take_pid, (long)css->replacement_pid);
         respond(c, RESP_FAIL, 0, 0, NULL, false);
+        css_conn_cleanup(c);
         return;
     }
-    log_debug("Accepted takeover phase 2 (challenge data req) from PID %li", (long)take_pid);
+    log_debug("REPLACE[old daemon]: Accepted takeover phase 2 (challenge data req) from PID %li", (long)take_pid);
     respond_tak2(css->loop, c);
 }
 
@@ -666,7 +678,7 @@ static void handle_req_take(css_conn_t* c, css_t* css)
 {
     const pid_t take_pid = (pid_t)c->rbuf.d;
     if (!css->replacement_pid || take_pid != css->replacement_pid || c != css->replace_conn_dmn) {
-        log_err("Denying illegal takeover request without pre-notification");
+        log_illegal_takeover('3', (long)take_pid, (long)css->replacement_pid);
         respond(c, RESP_FAIL, 0, 0, NULL, false);
         css_conn_cleanup(c);
         return;
@@ -707,8 +719,8 @@ static void css_conn_read(struct ev_loop* loop, ev_io* w, int revents V_UNUSED)
 {
     gdnsd_assert(revents == EV_READ);
     css_conn_t* c = w->data;
-    css_t* css = c->css;
     gdnsd_assert(c);
+    css_t* css = c->css;
     gdnsd_assert(css);
     gdnsd_assert(c->state == READING_REQ || c->state == READING_DATA);
 
@@ -956,6 +968,7 @@ static int make_tcp_listener_fd(const gdnsd_anysin_t* addr)
 F_NONNULL
 static void make_tcp_listeners(css_t* css)
 {
+    gdnsd_assert(css->socks_cfg);
     gdnsd_assert(css->socks_cfg->num_ctl_addrs);
     css->tcp_lsnrs = xcalloc_n(css->socks_cfg->num_ctl_addrs, sizeof(*css->tcp_lsnrs));
     for (unsigned i = 0; i < css->socks_cfg->num_ctl_addrs; i++) {
@@ -1044,7 +1057,7 @@ css_t* css_new(const char* argv0, socks_cfg_t* socks_cfg, csc_t** csc_p)
         req.d = (uint32_t)getpid();
         int* resp_fds = NULL;
         const size_t fds_recvd = csc_txn_getfds(csc, &req, &resp, &resp_fds);
-        gdnsd_assert(fds_recvd > 2U);
+        gdnsd_assert(fds_recvd >= 2U);
         gdnsd_assert(sock_fd == -1);
         gdnsd_assert(lock_fd == -1);
         lock_fd = resp_fds[0];
@@ -1110,7 +1123,7 @@ bool css_notify_zone_reloaders(css_t* css, const bool failed)
 {
     // Notify log and all waiting control sock clients of success/fail
     for (size_t i = 0; i < css->reload_zones_active.len; i++)
-        respond(css->reload_zones_active.q[i], failed ? RESP_FAIL : RESP_ACK, 0, 0, NULL, NULL);
+        respond(css->reload_zones_active.q[i], failed ? RESP_FAIL : RESP_ACK, 0, 0, NULL, false);
 
     // clear out the queue of clients waiting for reload status
     conn_queue_clear(&css->reload_zones_active);
