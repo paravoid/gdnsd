@@ -4,5 +4,5 @@ gdnsd: package-supports-alternative-init-but-no-init.d-script lib/systemd/system
 # used to be separate plugins, nowadays merged in the same binary but separate man
 gdnsd: spare-manual-page usr/share/man/man8/gdnsd-plugin-*.8.gz
 
-# "maximum number of tcp DNS connections gdnsd will allow to occur in parallel"
+# false positive
 gdnsd: typo-in-manual-page usr/share/man/man5/gdnsd.config.5.gz "allow to" "allow one to"
