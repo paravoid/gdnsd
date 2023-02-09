@@ -137,6 +137,7 @@ static void inject_child_plugin_config(dc_t* this_dc, const char* resname, vscf_
     if (!vscf_is_hash(cfg)) { // synthesize a hash for multifo for single/array
         vscf_data_t* newhash = vscf_hash_new();
         vscf_data_t* plugname_cfg = vscf_simple_new("multifo", 7);
+        gdnsd_assert(plugname_cfg);
         vscf_hash_add_val("plugin", 6, newhash, plugname_cfg);
         const unsigned alen = vscf_array_get_len(cfg);
         for (unsigned i = 0; i < alen; i++) {
@@ -432,7 +433,7 @@ static int map_res_inner(const char* resname, const uint8_t* zone_name, const ch
 
 /********** Callbacks from gdnsd **************/
 
-static void CB_LOAD_CONFIG(vscf_data_t* config, const unsigned num_threads V_UNUSED)
+static void CB_LOAD_CONFIG(vscf_data_t* config)
 {
     if (!config)
         log_fatal("plugin_" PNSTR ": configuration required in 'plugins' stanza");

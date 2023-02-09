@@ -35,6 +35,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/file.h>
+#include <sys/time.h>
 
 struct csc_s_ {
     int fd;
@@ -52,6 +53,9 @@ static bool csc_get_status(csc_t* csc)
     csbuf_t resp;
     memset(&req, 0, sizeof(req));
     req.key = REQ_INFO;
+    req.v0 = PACKAGE_V_MAJOR;
+    req.v1 = PACKAGE_V_MINOR;
+    req.v2 = PACKAGE_V_PATCH;
     if (csc_txn(csc, &req, &resp))
         return true;
 
@@ -394,7 +398,7 @@ size_t csc_get_stats_handoff(const csc_t* csc, uint64_t** raw_u64)
         return 0;
     }
 
-    if (handoff.key != REQ_SHAND) {
+    if (handoff.key != PSH_SHAND) {
         log_err("REPLACE[new daemon]: Stats handoff failed: wrong key %hhx", handoff.key);
         return 0;
     }

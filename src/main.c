@@ -46,6 +46,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
+#include <strings.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <sys/types.h>
@@ -87,6 +88,16 @@ F_NONNULL F_NORETURN
 static void syserr_for_ev(const char* msg)
 {
     log_fatal("%s: %s", msg, logf_errno());
+}
+
+static void* alloc_for_ev(void* ptr, long size)
+{
+    if (unlikely(size < 0))
+        log_fatal("Invalid alloc_for_ev() size %li\n", size);
+    if (size)
+        return xrealloc(ptr, (size_t)size);
+    free(ptr);
+    return 0;
 }
 
 static pthread_t zones_reloader_threadid;
@@ -328,7 +339,7 @@ static void do_tak2(struct ev_loop* loop, const csc_t* csc)
             log_fatal("REPLACE[new daemon]: takeover phase 2 notification attempt failed");
         const size_t chal_count = csbuf_get_v(&resp);
         const size_t chal_dlen = resp.d;
-        log_devdebug("TAK2 challenge handoff got count %zu dlen %zu", chal_count, chal_dlen);
+        log_debug("TAK2 challenge handoff got count %zu dlen %zu", chal_count, chal_dlen);
         size_t offset = 0;
         for (size_t i = 0; i < chal_count; i++) {
             if (offset + 5U > chal_dlen)
@@ -479,8 +490,9 @@ static css_t* runtime_execute(const char* argv0, socks_cfg_t* socks_cfg, css_t* 
     // Initialize dnspacket stuff
     dnspacket_global_setup(socks_cfg);
 
-    // Set up libev error callback
+    // Set up libev error+allocator callbacks
     ev_set_syserr_cb(&syserr_for_ev);
+    ev_set_allocator(&alloc_for_ev);
 
     // default ev loop in main process to handle statio, monitors, control
     // socket, signals, etc.
@@ -681,7 +693,7 @@ int main(int argc, char** argv)
     }
 
     // Load full configuration and expose through the global "gcfg"
-    gcfg = conf_load(cfg_root, socks_cfg, copts.force_zsd);
+    gcfg = conf_load(cfg_root, copts.force_zsd);
     vscf_destroy(cfg_root);
 
     // Basic init for the acme challenge code

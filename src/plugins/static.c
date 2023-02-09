@@ -30,6 +30,7 @@
 #include <stdbool.h>
 #include <inttypes.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -76,7 +77,7 @@ static bool config_res(const char* resname, unsigned resname_len V_UNUSED, vscf_
     return true;
 }
 
-static void plugin_static_load_config(vscf_data_t* config, const unsigned num_threads V_UNUSED)
+static void plugin_static_load_config(vscf_data_t* config)
 {
     if (!config)
         log_fatal("static plugin requires a 'plugins' configuration stanza");

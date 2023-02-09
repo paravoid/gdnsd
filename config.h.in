@@ -106,6 +106,15 @@
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
 
+/* Major version */
+#undef PACKAGE_V_MAJOR
+
+/* Minor version */
+#undef PACKAGE_V_MINOR
+
+/* Patch version */
+#undef PACKAGE_V_PATCH
+
 /* Define to necessary symbol if this constant uses a non-standard name on
    your system. */
 #undef PTHREAD_CREATE_JOINABLE

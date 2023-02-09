@@ -1,14 +1,35 @@
+m4_define([PKG_V_MAJOR],[3])
+m4_define([PKG_V_MINOR],[8])
+m4_define([PKG_V_PATCH],[0])
+m4_define([PKG_V_EXTRA],[])
+m4_define([PVER],[PKG_V_MAJOR().PKG_V_MINOR().PKG_V_PATCH()PKG_V_EXTRA()])
+
 AC_PREREQ([2.64])
-AC_INIT([gdnsd],[3.5.2],[https://github.com/gdnsd/gdnsd/issues],[gdnsd],[https://gdnsd.org])
+AC_INIT([gdnsd],[PVER],[https://github.com/gdnsd/gdnsd/issues],[gdnsd],[https://gdnsd.org])
 AC_CONFIG_SRCDIR([src/main.c])
 AC_CONFIG_AUX_DIR([acaux])
+AC_CANONICAL_TARGET
 AM_INIT_AUTOMAKE([1.13 dist-xz no-dist-gzip foreign tar-ustar subdir-objects -Wall])
 AC_CONFIG_MACRO_DIR([m4])
 AM_SILENT_RULES([yes])
 
+# Guard against version components that are out of range for the positive half
+# of a signed byte value.  Really we could use unsigned values too, but it
+# seems safer to be more-restrictive by default here so that we don't ever have
+# to worry about some integer conversion rule.  The major constraint here is
+# that our control socket protocol communicates these as unsigned byte values.
+AS_IF([test PKG_V_MAJOR -gt 127 -o PKG_V_MINOR -gt 127 -o PKG_V_PATCH -gt 127],
+    [AC_MSG_ERROR([Package version components must be <= 127])]
+)
+
+# Make the three numeric components available directly to code
+AC_DEFINE_UNQUOTED([PACKAGE_V_MAJOR], [PKG_V_MAJOR], [Major version])
+AC_DEFINE_UNQUOTED([PACKAGE_V_MINOR], [PKG_V_MINOR], [Minor version])
+AC_DEFINE_UNQUOTED([PACKAGE_V_PATCH], [PKG_V_PATCH], [Patch version])
+
+AC_USE_SYSTEM_EXTENSIONS
 # We're hoping for C11, but anything C99 or higher will work
 AC_PROG_CC_STDC
-AC_USE_SYSTEM_EXTENSIONS
 AM_PROG_CC_C_O
 
 # POSIX threads stuff
@@ -33,7 +54,7 @@ AC_CHECK_SIZEOF(size_t)
 AC_CHECK_SIZEOF(unsigned long)
 AC_CHECK_SIZEOF(unsigned long long)
 
-# Some tooling we need in our makefiles
+# Some tooling we need in our makefiles or here:
 AM_PROG_AR
 AC_PROG_RANLIB
 AC_PROG_LN_S

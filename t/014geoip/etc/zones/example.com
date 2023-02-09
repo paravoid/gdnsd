@@ -1,4 +1,4 @@
-@	SOA ns1 hostmaster (
+@	SOA ns1 dns-admin (
 	1      ; serial
 	7200   ; refresh
 	1800   ; retry
@@ -55,3 +55,7 @@ res-empty-a DYNA geoip!res-e
 res-empty-c DYNC geoip!res-e
 
 res-undef DYNA geoip!res-u
+
+*.res-w DYNA geoip!res-w
+
+res-noecs DYNA geoip!res-noecs

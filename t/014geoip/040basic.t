@@ -1,14 +1,14 @@
 # Basic geoip plugin tests
 
 use _GDT ();
-use Test::More tests => 58 * 2;
+use Test::More tests => 61 * 2;
 
 my $test_bin = $ENV{INSTALLCHECK_BINDIR}
     ? "$ENV{INSTALLCHECK_BINDIR}/gdnsd_geoip_test"
     : "$ENV{TOP_BUILDDIR}/src/plugins/gdnsd_geoip_test";
 my $test_exec = qq|$test_bin -c ${_GDT::OUTDIR}/etc|;
 
-my $neg_soa = 'example.com 900 SOA ns1.example.com hostmaster.example.com 1 7200 1800 259200 900';
+my $neg_soa = 'example.com 900 SOA ns1.example.com dns-admin.example.com 1 7200 1800 259200 900';
 
 # We re-run the same suite of tests against
 #  multiple config files with identical meaning,
@@ -463,6 +463,29 @@ _GDT->test_dns(
     q_optrr => _GDT::optrr_clientsub(addr_v4 => '192.0.2.0', src_mask => 24),
     answer => 'res-undef.example.com 86400 A 192.0.2.180',
     addtl => _GDT::optrr_clientsub(addr_v4 => '192.0.2.0', src_mask => 24, scope_mask => 1),
+    stats => [qw/udp_reqs edns edns_clientsub noerror/],
+);
+
+# Wildcard + DYNA:
+_GDT->test_dns(
+    qname => 'foo-abcdefg.res-w.example.com', qtype => 'A',
+    q_optrr => _GDT::optrr_clientsub(addr_v4 => '10.10.0.0', src_mask => 16),
+    answer => 'foo-abcdefg.res-w.example.com 86400 A 192.0.2.1',
+    addtl => _GDT::optrr_clientsub(addr_v4 => '10.10.0.0', src_mask => 16, scope_mask => 1),
+    stats => [qw/udp_reqs edns edns_clientsub noerror/],
+);
+
+# res-noecs for the ignore_ecs map setting
+_GDT->test_dns(
+    qname => 'res-noecs.example.com', qtype => 'A',
+    answer => 'res-noecs.example.com 86400 A 192.0.2.1',
+    stats => [qw/udp_reqs noerror/],
+);
+_GDT->test_dns(
+    qname => 'res-noecs.example.com', qtype => 'A',
+    q_optrr => _GDT::optrr_clientsub(addr_v4 => '192.0.2.1', src_mask => 32),
+    answer => 'res-noecs.example.com 86400 A 192.0.2.1',
+    addtl => _GDT::optrr_clientsub(addr_v4 => '192.0.2.1', src_mask => 32, scope_mask => 0),
     stats => [qw/udp_reqs edns edns_clientsub noerror/],
 );
 

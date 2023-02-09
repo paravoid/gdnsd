@@ -455,7 +455,11 @@ static pid_t spawn_replacement(const char* argv0)
         uint32_t sendpid = (uint32_t)replacement_pid;
         if (write(pipefd[PIPE_WR], &sendpid, 4) != 4)
             log_fatal("write() of PID during replacement spawn failed: %s", logf_errno());
+#ifdef GDNSD_VALGRIND
+        execl("/bin/true", "/bin/true", NULL);
+#else
         _exit(0);
+#endif
     }
 
     // --- original-parent code
@@ -737,7 +741,7 @@ static void css_conn_read(struct ev_loop* loop, ev_io* w, int revents V_UNUSED)
         if (pktlen < 0 && ERRNO_WOULDBLOCK)
             return;
         if (pktlen == 0)
-            log_devdebug("control socket client disconnected cleanly during read");
+            log_debug("control socket client disconnected cleanly during read");
         else
             log_err("control socket read of 8 bytes failed with retval %zi, closing: %s", pktlen, logf_errno());
         css_conn_cleanup(c);
@@ -1073,12 +1077,7 @@ css_t* css_new(const char* argv0, socks_cfg_t* socks_cfg, csc_t** csc_p)
     css->argv0 = xstrdup(argv0);
     css->socks_cfg = socks_cfg;
     css->status_d = (uint32_t)getpid();
-    uint8_t x;
-    uint8_t y;
-    uint8_t z;
-    if (3 != sscanf(PACKAGE_VERSION, "%hhu.%hhu.%hhu", &x, &y, &z))
-        log_fatal("BUG: Cannot parse our own package version");
-    css->status_v = csbuf_make_v(x, y, z);
+    css->status_v = csbuf_make_v(PACKAGE_V_MAJOR, PACKAGE_V_MINOR, PACKAGE_V_PATCH);
 
     if (sock_fd > -1)
         css->fd = sock_fd;
@@ -1154,7 +1153,7 @@ void css_send_stats_handoff(const css_t* css)
 
     csbuf_t handoff;
     memset(&handoff, 0, sizeof(handoff));
-    handoff.key = REQ_SHAND;
+    handoff.key = PSH_SHAND;
     csbuf_set_v(&handoff, 0);
     handoff.d = (uint32_t)dlen;
     ssize_t pktlen = send(c->fd, handoff.raw, 8, 0);
