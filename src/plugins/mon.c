@@ -28,6 +28,7 @@
 #include <gdnsd/misc.h>
 
 #include <string.h>
+#include <strings.h>
 #include <unistd.h>
 #include <fnmatch.h>
 
@@ -178,9 +179,10 @@ bool gdnsd_mon_parse_sttl(const char* sttl_str, gdnsd_sttl_t* sttl_out, unsigned
             *sttl_out = out;
         } else if (slash == '/' && *ttl_suffix) {
             char* endptr = NULL;
+            errno = 0;
             unsigned long ttl_tmp = strtoul(ttl_suffix, &endptr, 10);
             // strtoul finished the string successfully and value is in range
-            if (endptr && !*endptr && ttl_tmp <= GDNSD_STTL_TTL_MAX) {
+            if (!errno && endptr && !*endptr && ttl_tmp <= GDNSD_STTL_TTL_MAX) {
                 out = (out & ~GDNSD_STTL_TTL_MASK) | ttl_tmp;
                 assert_valid_sttl(out);
                 *sttl_out = out;
@@ -330,8 +332,13 @@ static void admin_deleted_file(const char* pathname)
             affected = true;
         }
     }
-    if (affected)
+
+    if (affected) {
         kick_sttl_update_timer();
+        log_info("admin_state: load complete (file deleted)");
+    } else {
+        log_info("admin_state: load complete (file deleted), no net changes");
+    }
 }
 
 F_NONNULL

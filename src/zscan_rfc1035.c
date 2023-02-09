@@ -271,9 +271,9 @@ static void dname_set(zscan_t* z, uint8_t* dname, unsigned len, bool lhs)
 //   function pointer to eliminate the possibility of
 //   inlining on non-gcc compilers, I hope) to avoid issues with
 //   setjmp and all of the local auto variables in zscan_rfc1035() below.
-typedef bool (*sij_func_t)(zscan_t*, char*, const unsigned);
+typedef bool (*sij_func_t)(zscan_t*, char*, const size_t);
 F_NONNULL F_NOINLINE
-static bool _scan_isolate_jmp(zscan_t* z, char* buf, const unsigned bufsize)
+static bool _scan_isolate_jmp(zscan_t* z, char* buf, const size_t bufsize)
 {
     if (!sigsetjmp(z->jbuf, 0)) {
         scanner(z, buf, bufsize);
@@ -556,8 +556,8 @@ static void rec_soa(zscan_t* z)
     if (ltree_add_rec_soa(
                 z->zone,
                 z->lhs_dname,
-                .master = z->rhs_dname,
-                .email = z->eml_dname,
+                .mname = z->rhs_dname,
+                .rname = z->eml_dname,
                 .ttl = z->ttl,
                 .serial = z->uv_1,
                 .refresh = z->uv_2,

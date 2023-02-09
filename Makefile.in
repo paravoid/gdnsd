@@ -95,6 +95,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
+target_triplet = @target@
 bin_PROGRAMS = src/plugins/gdnsd_geoip_test$(EXEEXT) \
 	src/gdnsdctl$(EXEEXT)
 sbin_PROGRAMS = src/gdnsd$(EXEEXT)
@@ -492,6 +493,7 @@ POD2MAN = @POD2MAN@
 PROVE = @PROVE@
 PTHREAD_CC = @PTHREAD_CC@
 PTHREAD_CFLAGS = @PTHREAD_CFLAGS@
+PTHREAD_CXX = @PTHREAD_CXX@
 PTHREAD_LIBS = @PTHREAD_LIBS@
 RANLIB = @RANLIB@
 SED = @SED@
@@ -553,7 +555,11 @@ sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
 sysconfdir = @sysconfdir@
 systemdsystemunitdir = @systemdsystemunitdir@
+target = @target@
 target_alias = @target_alias@
+target_cpu = @target_cpu@
+target_os = @target_os@
+target_vendor = @target_vendor@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
@@ -594,7 +600,7 @@ noinst_SCRIPTS = $(am__append_4) init/gdnsd.init
 
 # dist + install simple docs
 dist_doc_DATA = README.md VERSION3.md INSTALL AUTHORS COPYING NEWS \
-	docs/Manual.md docs/Security.md docs/stats_example.html
+	docs/Manual.md docs/ControlSocket.md docs/Security.md
 
 # Manpages for installation, generated via sed templating then pod2man
 man_MANS = $(PODS_IN_1:.podin=.1) $(PODS_IN_5:.podin=.5) \

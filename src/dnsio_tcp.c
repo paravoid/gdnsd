@@ -68,10 +68,15 @@ _Static_assert(TCP_READBUF >= (DNS_RECV_SIZE + 2U), "TCP readbuf fits >= 1 maxim
 _Static_assert(TCP_READBUF >= sizeof(proxy_hdr_t), "TCP readbuf >= PROXY header");
 #endif
 
+// TCP timeout timers may fire up to this many seconds late (even relative to
+// the ev_now of the loop, which may already be slightly-late) to be more
+// efficient at batching expiries and to deal better with timing edge cases.
+#define TIMEOUT_FUDGE 0.25
+
 typedef union {
-    // These two must be adjacent, as a single send() points at them as if
-    // they're one buffer.
     struct {
+        // These two must be adjacent, as a single send() points at them as if
+        // they're one buffer.
         uint16_t pktbuf_size_hdr;
         pkt_t pkt;
     };
@@ -82,12 +87,6 @@ typedef union {
 #if __STDC_VERSION__ >= 201112L // C11
 _Static_assert(_Alignof(pkt_t) <= _Alignof(uint16_t), "No padding for pkt");
 #endif
-
-typedef enum {
-    TH_RUN = 0,   // normal runtime operation
-    TH_GRACE = 1, // initial 5s grace during shutdown
-    TH_SHUT = 2,  // final 5s grace during shutdown
-} thr_state_t;
 
 struct conn;
 typedef struct conn conn_t;
@@ -116,7 +115,7 @@ typedef struct {
     size_t num_conns; // count of all conns, also len of connq list
     size_t check_mode_conns; // conns using check_watcher at present
     unsigned churn_count; // number of conn_t cached in "churn"
-    thr_state_t st;
+    bool grace_mode; // final 5s grace mode flag
     bool rcu_is_online;
 } thread_t;
 
@@ -224,17 +223,18 @@ static void connq_assert_sane(const thread_t* thr)
 
 // This adjust the timer to the next connq_head expiry or stops it if no
 // connections are left in the queue. when in either shutdown phase, we do not
-// update the timer, but we will stop it.  There is a 100ms floor/fudge factor
+// update the timer, but we will stop it.
 F_NONNULL
 static void connq_adjust_timer(thread_t* thr)
 {
     connq_assert_sane(thr);
     ev_timer* tmo = &thr->timeout_watcher;
     if (thr->connq_head) {
-        if (likely(thr->st == TH_RUN)) {
-            ev_tstamp next_interval = thr->server_timeout + 0.1 - (ev_now(thr->loop) - thr->connq_head->idle_start);
-            if (next_interval < 0.1)
-                next_interval = 0.1;
+        if (likely(!thr->grace_mode)) {
+            ev_tstamp next_interval = thr->server_timeout + TIMEOUT_FUDGE
+                                      - (ev_now(thr->loop) - thr->connq_head->idle_start);
+            if (next_interval < TIMEOUT_FUDGE)
+                next_interval = TIMEOUT_FUDGE;
             tmo->repeat = next_interval;
             ev_timer_again(thr->loop, tmo);
         }
@@ -319,8 +319,8 @@ static void connq_append_new_conn(thread_t* thr, conn_t* conn)
     gdnsd_assert(thr->connq_tail != conn);
     gdnsd_assert(!conn->next);
     gdnsd_assert(!conn->prev);
-    // accept() handler is gone when in either shutdown phase
-    gdnsd_assert(thr->st == TH_RUN);
+    // accept() handler is gone when in grace phase
+    gdnsd_assert(!thr->grace_mode);
 
     conn->idle_start = ev_now(thr->loop);
     thr->num_conns++;
@@ -415,11 +415,9 @@ static bool conn_write_packet(thread_t* thr, conn_t* conn, size_t resp_size)
     return false;
 }
 
-// DSO unidirectional send (server push at will, used during shutdown phases)
-// rd:true -> RetryDelay with Delay=0 (asks client to immediately close)
-// rd:false -> KeepAlive with KA=inf + Inact=0 (asks client to close at next idle point)
+// DSO unidirectional send of KeepAlive with KA=inf + Inact=0
 F_NONNULL
-static void conn_send_dso_uni(thread_t* thr, conn_t* conn, const bool rd)
+static void conn_send_dso_uni(thread_t* thr, conn_t* conn)
 {
     uint8_t* buf = thr->tpkt->pkt.raw;
 
@@ -428,26 +426,16 @@ static void conn_send_dso_uni(thread_t* thr, conn_t* conn, const bool rd)
     buf[2] = DNS_OPCODE_DSO << 3;
     size_t offset = 12;
 
-    // The basic 4 byte TLV header
-    const uint16_t tlv_type = rd ? DNS_DSO_RETRY_DELAY : DNS_DSO_KEEPALIVE;
-    const uint16_t tlv_len = rd ? 4U : 8U;
-    gdnsd_put_una16(htons(tlv_type), &buf[offset]);
+    // Construct DSO Keepalive pkt w/ KA=info + Inact=0
+    gdnsd_put_una16(htons(DNS_DSO_KEEPALIVE), &buf[offset]);
     offset += 2;
-    gdnsd_put_una16(htons(tlv_len), &buf[offset]);
+    gdnsd_put_una16(htons(8U), &buf[offset]);
     offset += 2;
-
-    // Type-specific data
-    if (rd) {
-        gdnsd_put_una32(0, &buf[offset]);
-        offset += 4;
-        gdnsd_assert(offset == 20U);
-    } else {
-        gdnsd_put_una32(0xFFFFFFFFU, &buf[offset]);
-        offset += 4;
-        gdnsd_put_una32(0, &buf[offset]);
-        offset += 4;
-        gdnsd_assert(offset == 24U);
-    }
+    gdnsd_put_una32(0xFFFFFFFFU, &buf[offset]);
+    offset += 4;
+    gdnsd_put_una32(0, &buf[offset]);
+    offset += 4;
+    gdnsd_assert(offset == 24U);
 
     // Add crypto padding if configured for the listener
     if (thr->tcp_pad) {
@@ -478,7 +466,7 @@ static void timeout_handler(struct ev_loop* loop V_UNUSED, ev_timer* t, const in
     gdnsd_assert(conn);
 
     // End of the 5s final shutdown phase: immediately close all connections and let the thread exit
-    if (unlikely(thr->st == TH_SHUT)) {
+    if (unlikely(thr->grace_mode)) {
         log_debug("TCP DNS thread shutdown: immediately dropping (RST) %zu delinquent connections while exiting", thr->num_conns);
         while (conn) {
             conn_t* next_conn = conn->next;
@@ -493,47 +481,6 @@ static void timeout_handler(struct ev_loop* loop V_UNUSED, ev_timer* t, const in
         thr->connq_tail = NULL;
         thr->num_conns = 0;
         return; // eventloop will end now, and shortly after the whole thread
-    }
-
-    // End of the 5s graceful phase (start 5s shutdown phase)
-    if (unlikely(thr->st == TH_GRACE)) {
-        log_debug("TCP DNS thread shutdown: demanding clients to close %zu remaining conns immediately and waiting up to 5s", thr->num_conns);
-        thr->st = TH_SHUT;
-        while (conn) {
-            conn_t* next_conn = conn->next;
-            ev_check* checkw = &conn->check_watcher;
-            // If any connection is still spooling buffered reqs in check mode,
-            // flip back to read watcher mode for shutdown drain.
-            if (ev_is_active(checkw)) {
-                gdnsd_assert(thr->check_mode_conns);
-                ev_check_stop(thr->loop, checkw);
-                ev_io* readw = &conn->read_watcher;
-                gdnsd_assert(!ev_is_active(readw));
-                ev_io_start(thr->loop, readw);
-                thr->check_mode_conns--;
-            }
-            // Wipe any outstanding read buffer state:
-            conn->readbuf_bytes = 0;
-            conn->readbuf_head = 0;
-            if (conn->dso.estab) {
-                conn_send_dso_uni(thr, conn, true); // send RetryDelay
-            } else {
-                shutdown(conn->read_watcher.fd, SHUT_WR);
-            }
-            conn = next_conn;
-        }
-
-        // Start the timer for the final 5s, if any clients are left (some may
-        // get closed above if we fail to write DSO unidirectionals to them).
-        ev_timer* tmo = &thr->timeout_watcher;
-        if (thr->num_conns) {
-            gdnsd_assert(!thr->check_mode_conns);
-            tmo->repeat = 5.0;
-            ev_timer_again(thr->loop, tmo);
-        } else {
-            gdnsd_assert(!ev_is_active(tmo));
-        }
-        return;
     }
 
     // Normal runtime timer fire for real conn expiry, expire from head of idle
@@ -567,7 +514,7 @@ static void stop_handler(struct ev_loop* loop, ev_async* w, int revents V_UNUSED
     gdnsd_assert(revents == EV_ASYNC);
     thread_t* thr = w->data;
     gdnsd_assert(thr);
-    gdnsd_assert(thr->st == TH_RUN); // this handler stops itself and transitions out of TH_RUN
+    gdnsd_assert(!thr->grace_mode); // this handler stops itself on grace entry
     connq_assert_sane(thr);
 
     // Stop the accept() watcher and the async watcher for this stop handler
@@ -588,8 +535,8 @@ static void stop_handler(struct ev_loop* loop, ev_async* w, int revents V_UNUSED
 
     log_debug("TCP DNS thread shutdown: gracefully requesting clients to close %zu remaining conns when able and waiting up to 5s", thr->num_conns);
 
-    // Switch thread state to the initial graceful shutdown phase
-    thr->st = TH_GRACE;
+    // Switch thread state to the "graceful" shutdown phase
+    thr->grace_mode = true;
 
     // Inform dnspacket layer we're in graceful shutdown phase (zero timeouts)
     dnspacket_ctx_set_grace(thr->pctx);
@@ -600,18 +547,18 @@ static void stop_handler(struct ev_loop* loop, ev_async* w, int revents V_UNUSED
     while (conn) {
         conn_t* next_conn = conn->next;
         if (conn->dso.estab)
-            conn_send_dso_uni(thr, conn, false);
+            conn_send_dso_uni(thr, conn);
         conn = next_conn;
     }
 
     // Up until now, the timeout watcher was firing dynamically according to
     // connection idleness, always pointing at the expiry point of the
     // head-most (most-idle) connection in the queue.  Now it is reset to fire
-    // once 5 seconds from now to transition from TH_GRACE to TH_SHUT and wait
-    // another 5 seconds there before exiting.  However, we won't bother if
-    // there's no clients left (it's possible in the case that they're all DSO
-    // connections, and they all experienced a write failure of their
-    // unidirectional keepalive above, causing termination).
+    // once 5 seconds from now to end our grace period and exit the thread.
+    // However, we won't bother if there's no clients left (it's possible in
+    // the case that they're all DSO connections, and they all experienced a
+    // write failure of their unidirectional keepalive above, causing
+    // termination).
     if (thr->num_conns) {
         // Start the timer for the final 5s, if any clients are left (some may
         // get closed above if we fail to write DSO unidirectionals to them).
@@ -685,11 +632,14 @@ static void conn_respond(thread_t* thr, conn_t* conn, const size_t req_size)
     conn->readbuf_head += req_bufsize;
     conn->readbuf_bytes -= req_bufsize;
 
-    // Bring RCU online and generate an answer
+    // Bring RCU online (or quiesce) and generate an answer
     if (!thr->rcu_is_online) {
         thr->rcu_is_online = true;
         rcu_thread_online();
+    } else {
+        rcu_quiescent_state();
     }
+
     conn->dso.last_was_ka = false;
     size_t resp_size = process_dns_query(thr->pctx, &conn->sa, &tpkt->pkt, &conn->dso, req_size);
     if (!resp_size) {
@@ -780,18 +730,8 @@ static bool conn_do_recv(thread_t* thr, conn_t* conn)
             stats_own_inc(&thr->stats->tcp.recvfail);
             stats_own_inc(&thr->stats->tcp.close_s_err);
         } else {
-            if (unlikely(thr->st == TH_SHUT)) {
-                if (conn->dso.estab) {
-                    log_debug("TCP DNS conn from %s closed by client while shutting down after DSO RetryDelay", logf_anysin(&conn->sa));
-                    stats_own_inc(&thr->stats->tcp.close_c);
-                } else {
-                    log_debug("TCP DNS conn from %s closed by client while shutting down after server half-close", logf_anysin(&conn->sa));
-                    stats_own_inc(&thr->stats->tcp.close_s_ok);
-                }
-            } else {
-                log_debug("TCP DNS conn from %s closed by client while idle (ideal close)", logf_anysin(&conn->sa));
-                stats_own_inc(&thr->stats->tcp.close_c);
-            }
+            log_debug("TCP DNS conn from %s closed by client while idle (ideal close)", logf_anysin(&conn->sa));
+            stats_own_inc(&thr->stats->tcp.close_c);
         }
         connq_destruct_conn(thr, conn, false, true);
         return true;
@@ -826,12 +766,6 @@ static void read_handler(struct ev_loop* loop V_UNUSED, ev_io* w, const int reve
     if (conn_do_recv(thr, conn))
         return; // no new bytes or conn closed
     gdnsd_assert(conn->readbuf_bytes);
-
-    // TH_SHUT means all conns are just draining junk reads looking for FIN
-    if (unlikely(thr->st == TH_SHUT)) {
-        conn->readbuf_bytes = 0; // throw away any received bytes
-        return;
-    }
 
     if (conn->need_proxy_init) {
         conn->need_proxy_init = false;
@@ -992,7 +926,14 @@ void tcp_dns_listen_setup(dns_thread_t* t)
     }
 
     sockopt_bool_fatal(TCP, sa, t->sock, SOL_SOCKET, SO_REUSEADDR, 1);
+    // We need SO_REUSEPORT for functional reasons
     sockopt_bool_fatal(TCP, sa, t->sock, SOL_SOCKET, SO_REUSEPORT, 1);
+#ifdef SO_REUSEPORT_LB
+    // If BSD's SO_REUSEPORT_LB is available, try to upgrade to that for better
+    // balancing, but merely warn on failure because it's new and there could
+    // be a compiletime vs runtime diff.
+    sockopt_bool_warn(TCP, sa, t->sock, SOL_SOCKET, SO_REUSEPORT_LB, 1);
+#endif
 
     sockopt_bool_fatal(TCP, sa, t->sock, SOL_TCP, TCP_NODELAY, 1);
 
@@ -1084,7 +1025,7 @@ void* dnsio_tcp_start(void* thread_asvoid)
 
     const dns_addr_t* addrconf = t->ac;
 
-    thread_t* thr = xcalloc(sizeof(*thr));
+    thread_t thr = { 0 };
 
     const int backlog = (int)(addrconf->tcp_backlog ? addrconf->tcp_backlog : SOMAXCONN);
     if (listen(t->sock, backlog) == -1)
@@ -1095,48 +1036,48 @@ void* dnsio_tcp_start(void* thread_asvoid)
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 
     // These are fixed values for the life of the thread based on config:
-    thr->server_timeout = (double)(addrconf->tcp_timeout * 2);
-    thr->max_clients = addrconf->tcp_clients_per_thread;
-    thr->do_proxy = addrconf->tcp_proxy;
-    thr->tcp_pad = addrconf->tcp_pad;
+    thr.server_timeout = (double)(addrconf->tcp_timeout * 2);
+    thr.max_clients = addrconf->tcp_clients_per_thread;
+    thr.do_proxy = addrconf->tcp_proxy;
+    thr.tcp_pad = addrconf->tcp_pad;
 
     // Set up the conn_t churn buffer, which saves some per-new-connection
     // memory allocation churn by saving up to sqrt(max_clients) old conn_t
     // storage for reuse
-    thr->churn_alloc = lrint(floor(sqrt(addrconf->tcp_clients_per_thread)));
-    gdnsd_assert(thr->churn_alloc >= 4U); // because tcp_cpt min is 16U
-    thr->churn = xmalloc_n(thr->churn_alloc, sizeof(*thr->churn));
+    thr.churn_alloc = lrint(floor(sqrt(addrconf->tcp_clients_per_thread)));
+    gdnsd_assert(thr.churn_alloc >= 4U); // because tcp_cpt min is 16U
+    thr.churn = xmalloc_n(thr.churn_alloc, sizeof(*thr.churn));
 
-    thr->tpkt = xcalloc(sizeof(*thr->tpkt));
+    thr.tpkt = xcalloc(sizeof(*thr.tpkt));
 
-    ev_idle* idle_watcher = &thr->idle_watcher;
+    ev_idle* idle_watcher = &thr.idle_watcher;
     ev_idle_init(idle_watcher, idle_handler);
     ev_set_priority(idle_watcher, -2);
-    idle_watcher->data = thr;
+    idle_watcher->data = &thr;
 
-    ev_io* accept_watcher = &thr->accept_watcher;
+    ev_io* accept_watcher = &thr.accept_watcher;
     ev_io_init(accept_watcher, accept_handler, t->sock, EV_READ);
     ev_set_priority(accept_watcher, -1);
-    accept_watcher->data = thr;
+    accept_watcher->data = &thr;
 
-    ev_timer* timeout_watcher = &thr->timeout_watcher;
-    ev_timer_init(timeout_watcher, timeout_handler, 0, thr->server_timeout);
+    ev_timer* timeout_watcher = &thr.timeout_watcher;
+    ev_timer_init(timeout_watcher, timeout_handler, 0, thr.server_timeout);
     ev_set_priority(timeout_watcher, 0);
-    timeout_watcher->data = thr;
+    timeout_watcher->data = &thr;
 
-    ev_prepare* prep_watcher = &thr->prep_watcher;
+    ev_prepare* prep_watcher = &thr.prep_watcher;
     ev_prepare_init(prep_watcher, prep_handler);
-    prep_watcher->data = thr;
+    prep_watcher->data = &thr;
 
-    ev_async* stop_watcher = &thr->stop_watcher;
+    ev_async* stop_watcher = &thr.stop_watcher;
     ev_async_init(stop_watcher, stop_handler);
     ev_set_priority(stop_watcher, 2);
-    stop_watcher->data = thr;
+    stop_watcher->data = &thr;
 
     struct ev_loop* loop = ev_loop_new(EVFLAG_AUTO);
     if (!loop)
         log_fatal("ev_loop_new() failed");
-    thr->loop = loop;
+    thr.loop = loop;
 
     ev_async_start(loop, stop_watcher);
     ev_io_start(loop, accept_watcher);
@@ -1144,9 +1085,9 @@ void* dnsio_tcp_start(void* thread_asvoid)
     ev_unref(loop); // prepare should not hold a ref, but should run to the end
 
     // register_thread() hooks us into the ev_async-based shutdown-handling
-    // code, therefore we must have thr->loop and thr->stop_watcher initialized
+    // code, therefore we must have thr.loop and thr.stop_watcher initialized
     // and ready before we register here
-    register_thread(thr);
+    register_thread(&thr);
 
     // dnspacket_ctx_init() is what releases threads through the startup gates,
     // and main.c's call to dnspacket_wait_stats() waits for all threads to
@@ -1154,23 +1095,22 @@ void* dnsio_tcp_start(void* thread_asvoid)
     // Therefore, this must happen after register_thread() above, to ensure
     // that all tcp threads are properly registered with the shutdown handler
     // before we begin processing possible future shutdown events.
-    thr->pctx = dnspacket_ctx_init_tcp(&thr->stats, addrconf->tcp_pad, addrconf->tcp_timeout);
+    thr.pctx = dnspacket_ctx_init_tcp(&thr.stats, addrconf->tcp_pad, addrconf->tcp_timeout);
 
     rcu_register_thread();
-    thr->rcu_is_online = true;
+    thr.rcu_is_online = true;
 
     ev_run(loop, 0);
 
     rcu_unregister_thread();
 
-    unregister_thread(thr);
+    unregister_thread(&thr);
     ev_loop_destroy(loop);
-    dnspacket_ctx_cleanup(thr->pctx);
-    for (unsigned i = 0; i < thr->churn_count; i++)
-        free(thr->churn[i]);
-    free(thr->churn);
-    free(thr->tpkt);
-    free(thr);
+    dnspacket_ctx_cleanup(thr.pctx);
+    for (unsigned i = 0; i < thr.churn_count; i++)
+        free(thr.churn[i]);
+    free(thr.churn);
+    free(thr.tpkt);
 
     return NULL;
 }
