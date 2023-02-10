@@ -1,8 +1,23 @@
-gdnsd (3.8.0-1) UNRELEASED; urgency=medium
+gdnsd (3.8.0-1) unstable; urgency=high
 
-  * New upstream release.
+  * New upstream release, with various optimizations and QA fixes.
+  * Add three upstream patches to the test suite, to fix compatibility with
+    Net::DNS > 1.32, and specifically API breakages introduced with 1.32 and
+    1.36. Resolves a long-standing FTBFS. (Closes: #1002225)
+  * Add an upstream patch to the test suite to resolve races while tailing
+    gdnsd.out, that manifested in random failures for several tests.
+  * Mark the daemon autopkgtest as "flaky" and the common-operations one as
+    "skippable", with code to skip when the daemon is not running. This
+    reduces our test coverage, but accounts for other daemons having taken
+    over port 53 and gdnsd being unable to start. Notably, this is the case by
+    default in the Ubuntu autopkgtest environment, which has systemd-resolved
+    installed. (LP: #1764327)
+  * Urgency high for an RC bug fix release and for re-entry to testing.
+  * Switch debian/watch to the GitHub API, as the old web scraping method does
+    not work anymore.
+  * Bump Standards-Version to 4.6.2, no changes needed.
 
- -- Faidon Liambotis <paravoid@debian.org>  Thu, 09 Feb 2023 19:34:08 +0200
+ -- Faidon Liambotis <paravoid@debian.org>  Fri, 10 Feb 2023 06:23:31 +0200
 
 gdnsd (3.5.2-1) unstable; urgency=medium
 
