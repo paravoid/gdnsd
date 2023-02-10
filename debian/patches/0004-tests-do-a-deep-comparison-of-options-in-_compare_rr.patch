@@ -1,0 +1,73 @@
+From: Faidon Liambotis <paravoid@debian.org>
+Date: Fri, 10 Feb 2023 01:28:27 +0000
+Subject: tests: do a deep comparison of options in _compare_rrsets
+
+The current code compares RRsets by comparing the output of the ->string
+function, which has remained stable.
+
+That is, until Net::DNS 1.36, where the string output of e.g. CLIENT-SUBNET is
+the JSON representation of a hash with its components as members (family,
+scope, etc.), as constructed by _format_option internally. With hashes in Perl
+being unordered, this creates non-deterministic output.
+
+Code in the SVN trunk suggests there is now a sort, to sort the hash by key.
+However, this code is not yet released, and 1.36 can be found in the wild,
+including in distributions like Debian bookworm.
+
+Therefore, add code to do a deep-level comparison instead, ensuring that the
+options of each RRset match each other.
+
+Backwards-compatible, tested with 1.05, and 1.32 - 1.36.
+---
+ t/_GDT.pm | 38 +++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 37 insertions(+), 1 deletion(-)
+
+diff --git a/t/_GDT.pm b/t/_GDT.pm
+index 66e715c..feb5696 100644
+--- a/t/_GDT.pm
++++ b/t/_GDT.pm
+@@ -884,7 +884,43 @@ sub _compare_rrsets {
+     my $found = 0;
+     for(my $i = 0; $i < scalar @$a_rrset; $i++) {
+         for(my $j = 0; $j < scalar @comp_idx; $j++) {
+-           if($a_rrset->[$i]->string eq $c_rrset->[$comp_idx[$j]]->string) {
++           my $a = $a_rrset->[$i];
++           my $c = $c_rrset->[$comp_idx[$j]];
++
++           # ->string output of OPT is not stable (broken in 1.36), due to the
++           #   inclusion of (unordered) hashes. Do a deep comparison instead,
++           #   comparing every option between $a and $c. Code in SVN trunk
++           #   suggests this may be fixed in later releases, but 1.36 is
++           #   found in the wild.
++           if($a->type eq 'OPT' && $c->type eq 'OPT') {
++               # bail-out early if the number of options differs
++               next unless scalar $a->options eq scalar $c->options;
++
++               my $a_matches = 0;
++               foreach my $opt ($a->options) {
++                   # check if the option is defined only in $a
++                   next unless defined $c->option($opt);
++                   # found in both, now check if they match
++                   # this is a scalar comparison, checking their binary forms
++                   next unless $a->option($opt) eq $c->option($opt);
++                   $a_matches++;
++               }
++
++               my $c_matches = 0;
++               foreach my $opt ($c->options) {
++                   # check if the option is defined only in $c
++                   next unless defined $a->option($opt);
++                   $c_matches++;
++               }
++
++               if ($a->options == $a_matches && $c->options == $c_matches) {
++                   $found++;
++                   splice(@comp_idx, $j, 1);
++                   last;
++               }
++           }
++
++           if($a->string eq $c->string) {
+               $found++;
+               splice(@comp_idx, $j, 1);
+               last;

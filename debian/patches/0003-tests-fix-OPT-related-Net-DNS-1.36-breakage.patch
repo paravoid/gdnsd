@@ -1,0 +1,352 @@
+From: Faidon Liambotis <paravoid@debian.org>
+Date: Thu, 9 Feb 2023 22:38:02 +0000
+Subject: tests: fix OPT-related Net::DNS 1.36 breakage
+
+With Net::DNS 1.36, code such as:
+  $optrr->option('TCP-KEEPALIVE' => pack('n', 370));
+is now broken, with the function doing the packing internally, and
+therefore expecting something like:
+  $optrr->option('TCP-KEEPALIVE' => 370);
+
+It gets even murkier for more complex structures like CLIENT-SUBNET. Plus, it's
+not clear how we could construct invalid binary data, like we are to generate
+e.g. too short options.
+
+This is likely an upstream regression that may be fixed in the future. However,
+1.36 has now found its way into downstream distributions, cementing the issue
+for years to come.
+
+Thankfully, working around this is not too bad: one can mess directly with the
+internals of Net::DNS::RR:OPT, and set the option in the hash directly. As this
+is an internal data structure, it may break in the future; it's not like
+published APIs are stable, though, so we can cross that bridge when we comes to
+it. It is, at least, backwards-compatible: tested with 1.05 and 1.32 - 1.36.
+
+Introduce a new _GDT::optrr_option_set helper function for ease of use, and
+convert all users.
+---
+ t/003complex/005big.t             |  2 +-
+ t/003complex/009broken.t          |  8 ++++----
+ t/005tld/020tld.t                 |  4 ++--
+ t/013clientsub/039clientsub.t     | 25 +++++++++++++++++--------
+ t/021caa/047caa.t                 |  4 ++--
+ t/023cookies/050cookies.t         | 14 +++++++-------
+ t/024cookies_max/051cookies_max.t |  4 ++--
+ t/025nocookies/052nocookies.t     |  2 +-
+ t/_GDT.pm                         | 27 ++++++++++++++++++++++++---
+ 9 files changed, 60 insertions(+), 30 deletions(-)
+
+diff --git a/t/003complex/005big.t b/t/003complex/005big.t
+index 838aa3c..bac4b31 100644
+--- a/t/003complex/005big.t
++++ b/t/003complex/005big.t
+@@ -22,7 +22,7 @@ my $optrr_keepalive = Net::DNS::RR->new(
+     rcode => 0,
+     flags => 0,
+ );
+-$optrr_keepalive->option(11 => pack('n', 370));
++_GDT::optrr_option_set($optrr_keepalive, 'TCP-KEEPALIVE', pack('n', 370));
+ 
+ my $big_answers = [
+     'big.example.com 21600 MX 0 asdf.example.com',
+diff --git a/t/003complex/009broken.t b/t/003complex/009broken.t
+index 8c91017..dd7c717 100644
+--- a/t/003complex/009broken.t
++++ b/t/003complex/009broken.t
+@@ -82,7 +82,7 @@ my @edns_base = (
+ # EDNS unknown option
+ {
+     my $optrr_req = Net::DNS::RR->new(@edns_base);
+-    $optrr_req->option(0x5555 => 'foo');
++    _GDT::optrr_option_set($optrr_req, 0x5555, 'foo');
+     my $optrr_res = Net::DNS::RR->new(@edns_base);
+     _GDT->test_dns(
+         qname => 'foo.example.com', qtype => 'A',
+@@ -96,7 +96,7 @@ my @edns_base = (
+ # EDNS unknown option + zero optlen
+ {
+     my $optrr_req = Net::DNS::RR->new(@edns_base);
+-    $optrr_req->option(0x5555 => '');
++    _GDT::optrr_option_set($optrr_req, 0x5555, '');
+     my $optrr_res = Net::DNS::RR->new(@edns_base);
+     _GDT->test_dns(
+         qname => 'foo.example.com', qtype => 'A',
+@@ -126,7 +126,7 @@ my $optrr_resp = Net::DNS::RR->new(
+         rcode => 0,
+         flags => 0,
+     );
+-    $optrr_nsid->option(NSID => '');
++    _GDT::optrr_option_set($optrr_nsid, 'NSID', '');
+ 
+     _GDT->test_dns(
+         qname => 'foo.example.com', qtype => 'A',
+@@ -147,7 +147,7 @@ my $optrr_resp = Net::DNS::RR->new(
+         rcode => 0,
+         flags => 0,
+     );
+-    $optrr_nsid_withdata->option(NSID => pack('H*', '6578616D706C65'));
++    _GDT::optrr_option_set($optrr_nsid_withdata, 'NSID', pack('H*', '6578616D706C65'));
+ 
+     _GDT->test_dns(
+         qname => 'foo.example.com', qtype => 'A',
+diff --git a/t/005tld/020tld.t b/t/005tld/020tld.t
+index e478224..b88246c 100644
+--- a/t/005tld/020tld.t
++++ b/t/005tld/020tld.t
+@@ -12,7 +12,7 @@ my $optrr_req_nsid = Net::DNS::RR->new(
+     rcode => 0,
+     flags => 0,
+ );
+-$optrr_req_nsid->option(NSID => '');
++_GDT::optrr_option_set($optrr_req_nsid, 'NSID', '');
+ 
+ my $optrr_nsid = Net::DNS::RR->new(
+     type => "OPT",
+@@ -22,7 +22,7 @@ my $optrr_nsid = Net::DNS::RR->new(
+     rcode => 0,
+     flags => 0,
+ );
+-$optrr_nsid->option(NSID => pack('H*', '6578616D706C65'));
++_GDT::optrr_option_set($optrr_nsid, 'NSID', pack('H*', '6578616D706C65'));
+ 
+ my $optrr_nonsid = Net::DNS::RR->new(
+     type => "OPT",
+diff --git a/t/013clientsub/039clientsub.t b/t/013clientsub/039clientsub.t
+index 1a208c3..4c9c404 100644
+--- a/t/013clientsub/039clientsub.t
++++ b/t/013clientsub/039clientsub.t
+@@ -188,7 +188,9 @@ _GDT->test_dns(
+ 
+ # V4 not enough addr bytes for src_mask
+ my $optrr_short_v4 = Net::DNS::RR->new(@optrr_base);
+-$optrr_short_v4->option('CLIENT-SUBNET' => pack('nCCa3', 1, 32, 0, inet_pton(AF_INET, "0.0.0.0")));
++my $data_v4 = pack('nCCa3', 1, 32, 0, inet_pton(AF_INET, "0.0.0.0"));
++_GDT::optrr_option_set($optrr_short_v4, 'CLIENT-SUBNET', $data_v4);
++
+ _GDT->test_dns(
+     v4_only => 1,
+     qname => 'reflect-best.example.com', qtype => 'A',
+@@ -200,7 +202,8 @@ _GDT->test_dns(
+ 
+ # V6 not enough addr bytes for src_mask
+ my $optrr_short_v6 = Net::DNS::RR->new(@optrr_base);
+-$optrr_short_v6->option('CLIENT-SUBNET' => pack('nCCa15', 2, 128, 0, inet_pton(AF_INET6, "::")));
++my $data_v6 = pack('nCCa15', 2, 128, 0, inet_pton(AF_INET6, "::"));
++_GDT::optrr_option_set($optrr_short_v6, 'CLIENT-SUBNET', $data_v6);
+ _GDT->test_dns(
+     v6_only => 1,
+     qname => 'reflect-best.example.com', qtype => 'AAAA',
+@@ -212,7 +215,8 @@ _GDT->test_dns(
+ 
+ # Bad address family
+ my $optrr_badfam = Net::DNS::RR->new(@optrr_base);
+-$optrr_badfam->option('CLIENT-SUBNET' => pack('nCCa16', 3, 128, 0, inet_pton(AF_INET6, "::")));
++my $data_badfam = pack('nCCa16', 3, 128, 0, inet_pton(AF_INET6, "::"));
++_GDT::optrr_option_set($optrr_badfam, 'CLIENT-SUBNET', $data_badfam);
+ _GDT->test_dns(
+     qname => 'reflect-best.example.com', qtype => 'AAAA',
+     q_optrr => $optrr_badfam,
+@@ -223,7 +227,8 @@ _GDT->test_dns(
+ 
+ # option too short
+ my $optrr_short_rdlen = Net::DNS::RR->new(@optrr_base);
+-$optrr_short_rdlen->option('CLIENT-SUBNET' => pack('C', 1));
++my $data_short_rdlen = pack('C', 1);
++_GDT::optrr_option_set($optrr_short_rdlen, 'CLIENT-SUBNET', $data_short_rdlen);
+ _GDT->test_dns(
+     qname => 'reflect-best.example.com', qtype => 'AAAA',
+     q_optrr => $optrr_short_rdlen,
+@@ -234,7 +239,8 @@ _GDT->test_dns(
+ 
+ # excess address bytes for src mask
+ my $optrr_excess_addr = Net::DNS::RR->new(@optrr_base);
+-$optrr_excess_addr->option('CLIENT-SUBNET' => pack('nCCa4', 1, 24, 0, inet_pton(AF_INET, "192.0.2.1")));
++my $data_excess_addr = pack('nCCa4', 1, 24, 0, inet_pton(AF_INET, "192.0.2.1"));
++_GDT::optrr_option_set($optrr_excess_addr, 'CLIENT-SUBNET', $data_excess_addr);
+ _GDT->test_dns(
+     qname => 'reflect-best.example.com', qtype => 'AAAA',
+     q_optrr => $optrr_excess_addr,
+@@ -245,7 +251,8 @@ _GDT->test_dns(
+ 
+ # excess non-zero bits beyond mask in final address byte
+ my $optrr_excess_bits = Net::DNS::RR->new(@optrr_base);
+-$optrr_excess_bits->option('CLIENT-SUBNET' => pack('nCCa4', 1, 31, 0, inet_pton(AF_INET, "192.0.2.1")));
++my $data_excess_bits = pack('nCCa4', 1, 31, 0, inet_pton(AF_INET, "192.0.2.1"));
++_GDT::optrr_option_set($optrr_excess_bits, 'CLIENT-SUBNET', $data_excess_bits);
+ _GDT->test_dns(
+     qname => 'reflect-best.example.com', qtype => 'AAAA',
+     q_optrr => $optrr_excess_bits,
+@@ -256,7 +263,8 @@ _GDT->test_dns(
+ 
+ # non-zero scope mask
+ my $optrr_badscope = Net::DNS::RR->new(@optrr_base);
+-$optrr_badscope->option('CLIENT-SUBNET' => pack('nCCa4', 1, 24, 1, inet_pton(AF_INET, "192.0.2.0")));
++my $data_badscope = pack('nCCa4', 1, 24, 1, inet_pton(AF_INET, "192.0.2.0"));
++_GDT::optrr_option_set($optrr_badscope, 'CLIENT-SUBNET', $data_badscope);
+ _GDT->test_dns(
+     qname => 'reflect-best.example.com', qtype => 'AAAA',
+     q_optrr => $optrr_badscope,
+@@ -267,7 +275,8 @@ _GDT->test_dns(
+ 
+ # formerr for arbitrary junk family
+ my $optrr_junkfam = Net::DNS::RR->new(@optrr_base);
+-$optrr_junkfam->option('CLIENT-SUBNET' => pack('nCC', 42, 0, 0));
++my $data_junkfam = pack('nCC', 42, 0, 0);
++_GDT::optrr_option_set($optrr_junkfam, 'CLIENT-SUBNET', $data_junkfam);
+ _GDT->test_dns(
+     v4_only => 1,
+     qname => 'reflect-best.example.com', qtype => 'A',
+diff --git a/t/021caa/047caa.t b/t/021caa/047caa.t
+index 87ee24d..531ab49 100644
+--- a/t/021caa/047caa.t
++++ b/t/021caa/047caa.t
+@@ -11,7 +11,7 @@ my $optrr_req_nsid = Net::DNS::RR->new(
+     rcode => 0,
+     flags => 0,
+ );
+-$optrr_req_nsid->option(NSID => '');
++_GDT::optrr_option_set($optrr_req_nsid, 'NSID', '');
+ 
+ my $optrr_nsid = Net::DNS::RR->new(
+     type => "OPT",
+@@ -21,7 +21,7 @@ my $optrr_nsid = Net::DNS::RR->new(
+     rcode => 0,
+     flags => 0,
+ );
+-$optrr_nsid->option(NSID => pack('H*', '6578616D706C65'));
++_GDT::optrr_option_set($optrr_nsid, 'NSID', pack('H*', '6578616D706C65'));
+ 
+ _GDT->test_dns(
+     qname => 'example.com', qtype => 'TYPE257',
+diff --git a/t/023cookies/050cookies.t b/t/023cookies/050cookies.t
+index f4e46fa..820a24d 100644
+--- a/t/023cookies/050cookies.t
++++ b/t/023cookies/050cookies.t
+@@ -16,7 +16,7 @@ sub _mk_optrr_cookie {
+         flags => 0,
+     );
+     if (defined $data) {
+-        $optrr_cookie->option(COOKIE => $data);
++        _GDT::optrr_option_set($optrr_cookie, 'COOKIE', $data);
+     }
+     return $optrr_cookie;
+ }
+@@ -144,14 +144,14 @@ foreach my $proto (qw/v4_only v6_only/) {
+     # Do it over TCP so we can do keepalive option response as well
+ 
+     my $all_the_opts_query = _mk_optrr_cookie(hexstr('0123456789ABCDEF'));
+-    $all_the_opts_query->option(NSID => '');
+-    $all_the_opts_query->option(11 => '');
+-    $all_the_opts_query->option('CLIENT-SUBNET' => pack('nCCa16', 2, 128, 0, inet_pton(AF_INET6, "::")));
++    _GDT::optrr_option_set($all_the_opts_query, 'TCP-KEEPALIVE', '');
++    _GDT::optrr_option_set($all_the_opts_query, 'NSID', '');
++    _GDT::optrr_option_set($all_the_opts_query, 'CLIENT-SUBNET', pack('nCCa16', 2, 128, 0, inet_pton(AF_INET6, "::")));
+ 
+     my $all_the_opts_response = _mk_optrr_cookie(hexstr('0123456789ABCDEF0000000000000000'));
+-    $all_the_opts_response->option('CLIENT-SUBNET' => pack('nCCa16', 2, 128, 0, inet_pton(AF_INET6, "::")));
+-    $all_the_opts_response->option(11 => pack('n', 370));
+-    $all_the_opts_response->option(NSID => 'foobar');
++    _GDT::optrr_option_set($all_the_opts_response, 'TCP-KEEPALIVE', pack('n', 370));
++    _GDT::optrr_option_set($all_the_opts_response, 'NSID', 'foobar');
++    _GDT::optrr_option_set($all_the_opts_response, 'CLIENT-SUBNET', pack('nCCa16', 2, 128, 0, inet_pton(AF_INET6, "::")));
+ 
+     _GDT->test_dns(
+         $proto => 1,
+diff --git a/t/024cookies_max/051cookies_max.t b/t/024cookies_max/051cookies_max.t
+index cfbc57c..4e874b1 100644
+--- a/t/024cookies_max/051cookies_max.t
++++ b/t/024cookies_max/051cookies_max.t
+@@ -14,7 +14,7 @@ sub _mk_optrr_cookie {
+         flags => 0,
+     );
+     if (defined $data) {
+-        $optrr_cookie->option(COOKIE => $data);
++        _GDT::optrr_option_set($optrr_cookie, 'COOKIE', $data);
+     }
+     return $optrr_cookie;
+ }
+@@ -53,7 +53,7 @@ foreach my $proto (qw/v4_only v6_only/) {
+     # do it again with a bad cookie over TCP, should get the large response
+     # fine in spite of the (UDP-only) limit and the bad cookie noted in stats
+     my $cookie_plus_keepalive = _mk_optrr_cookie(hexstr('0123456789ABCDEF0000000000000000'));
+-    $cookie_plus_keepalive->option(11 => pack('n', 370));
++    _GDT::optrr_option_set($cookie_plus_keepalive, 11, pack('n', 370));
+     _GDT->test_dns(
+         $proto => 1,
+         resopts => { usevc => 1 },
+diff --git a/t/025nocookies/052nocookies.t b/t/025nocookies/052nocookies.t
+index c5f4330..e40c756 100644
+--- a/t/025nocookies/052nocookies.t
++++ b/t/025nocookies/052nocookies.t
+@@ -14,7 +14,7 @@ sub _mk_optrr_cookie {
+         flags => 0,
+     );
+     if (defined $data) {
+-        $optrr_cookie->option(COOKIE => $data);
++        _GDT::optrr_option_set($optrr_cookie, 'COOKIE', $data);
+     }
+     return $optrr_cookie;
+ }
+diff --git a/t/_GDT.pm b/t/_GDT.pm
+index 9f73aaa..66e715c 100644
+--- a/t/_GDT.pm
++++ b/t/_GDT.pm
+@@ -32,6 +32,7 @@ use Scalar::Util qw/looks_like_number/;
+ use FindBin ();
+ use File::Spec ();
+ use Net::DNS 1.03 ();
++use Net::DNS::Parameters qw(ednsoptionbyname);
+ use Net::DNS::Resolver ();
+ use Test::More ();
+ use File::Copy qw//;
+@@ -648,6 +649,24 @@ sub get_resolver6 {
+     );
+ }
+ 
++# Helper to sets the option for an EDNS OPT record.
++
++#  Accesses Net::DNS internals, and is used instead of the upstream
++#    $optrr->option($name => $value)
++#  ...the API for which was changed in 1.35 by packing the data internally,
++#  therefore breaking in non-backwards-compatible ways, and also not allowing
++#  us to construct invalid data (e.g. too short) as we do in our tests.
++sub optrr_option_set {
++    my ($optrr, $name, $value) = @_;
++
++    my $number;
++    # hardcode here, as this was introduced in 1.04
++    $number = 11 if $name eq 'TCP-KEEPALIVE';
++
++    $number = ednsoptionbyname($name) unless defined $number;
++    $optrr->{option}->{$number} = $value;
++}
++
+ # Creates a new Net::DNS::Packet which is a query response,
+ #  to compare with the real server response for correctness.
+ #  Args are: { headerparam => value }, $question, [ answers ], [ auths ], [ addtl ]
+@@ -828,7 +847,7 @@ sub _compare_rrsets {
+                 $_lastacookie = $acookieval;
+                 if ($acookielen > 8) {
+                     substr($acookieval, 8, $acookielen - 8, "\x00" x ($acookielen - 8));
+-                    $a_rrset->[0]->option(COOKIE => $acookieval);
++                    _GDT::optrr_option_set($a_rrset->[0], 'COOKIE', $acookieval);
+                 }
+             }
+         }
+@@ -1281,12 +1300,14 @@ sub optrr_clientsub {
+     if(defined $args{addr_v4} || defined $args{addr_v6}) {
+         my $src_mask = $args{src_mask};
+         my $addr_bytes = ($src_mask >> 3) + (($src_mask & 7) ? 1 : 0);
++        my $data_ecs;
+         if(defined $args{addr_v4}) {
+-            $optrr->option('CLIENT-SUBNET' => pack('nCCa' . $addr_bytes, 1, $args{src_mask}, $args{scope_mask}, inet_pton(AF_INET, $args{addr_v4})));
++            $data_ecs = pack('nCCa' . $addr_bytes, 1, $args{src_mask}, $args{scope_mask}, inet_pton(AF_INET, $args{addr_v4}));
+         }
+         else {
+-            $optrr->option('CLIENT-SUBNET' => pack('nCCa' . $addr_bytes, 2, $args{src_mask}, $args{scope_mask}, inet_pton(AF_INET6, $args{addr_v6})));
++            $data_ecs = pack('nCCa' . $addr_bytes, 2, $args{src_mask}, $args{scope_mask}, inet_pton(AF_INET6, $args{addr_v6}));
+         }
++        _GDT::optrr_option_set($optrr, 'CLIENT-SUBNET', $data_ecs);
+     }
+ 
+     $optrr;

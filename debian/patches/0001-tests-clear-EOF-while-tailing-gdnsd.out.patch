@@ -1,0 +1,24 @@
+From: Faidon Liambotis <paravoid@debian.org>
+Date: Thu, 9 Feb 2023 18:51:26 +0200
+Subject: tests: clear EOF while tailing gdnsd.out
+
+There is a race when tailing gdnsd.out in test_log_output, where EOF is
+set before the matching line is found, and then the stream refuses to
+proceed. Standard practice is to clearerr() or seek(fh, 0, SEEK_CUR);
+for example, see O'Reilly's Perl Cookbook, chapter 8.5.
+---
+ t/_GDT.pm | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/t/_GDT.pm b/t/_GDT.pm
+index 9ff1927..f5d3aa6 100644
+--- a/t/_GDT.pm
++++ b/t/_GDT.pm
+@@ -545,6 +545,7 @@ sub test_log_output {
+     # for the $partial/$line code and \n-checking .
+     my $partial = '';
+     while($retry--) {
++        seek($GDOUT_FH, 0, 1);  # SEEK_CUR+0, to clear EOF
+         while(scalar(keys %$texts) && ($_ = <$GDOUT_FH>)) {
+             $partial .= $_;
+             if($partial =~ /\n$/) {

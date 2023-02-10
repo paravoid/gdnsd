@@ -1,0 +1,4 @@
+0001-tests-clear-EOF-while-tailing-gdnsd.out.patch
+0002-tests-skip-RD-mismatch-broken-by-Net-DNS-1.33.patch
+0003-tests-fix-OPT-related-Net-DNS-1.36-breakage.patch
+0004-tests-do-a-deep-comparison-of-options-in-_compare_rr.patch

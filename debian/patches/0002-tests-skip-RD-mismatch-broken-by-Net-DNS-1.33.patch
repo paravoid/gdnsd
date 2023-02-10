@@ -1,0 +1,47 @@
+From: Faidon Liambotis <paravoid@debian.org>
+Date: Thu, 9 Feb 2023 18:44:41 +0200
+Subject: tests: skip RD mismatch, broken by Net::DNS 1.33+
+
+In the upstream Net::DNS SVN revision r1855, buried in a large commit with the
+one-line commit message "accumulated minor changes", included a the 1.33
+release (and up to at least 1.36), is this diff:
+
+  @@ -973,10 +973,6 @@ sub _make_query_packet {
+          if ( ref($packet) ) {
+                  my $edns = $packet->edns;                       # advertise UDPsize for local stack
+                  $edns->size( $self->{udppacketsize} ) unless defined $edns->{size};
+  -
+  -               my $header = $packet->header;
+  -               $header->rd( $self->{recurse} ) if $header->opcode eq 'QUERY';
+  -
+          } else {
+                  $packet = Net::DNS::Packet->new(@_);
+                  $packet->edns->size( $self->{udppacketsize} );
+
+This breaks the "RD mismatch" check in _GDT.pm, in turn breaking lots of tests.
+Comment-out the relevant check, rather than try to re-add this code.
+---
+ t/_GDT.pm | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/t/_GDT.pm b/t/_GDT.pm
+index f5d3aa6..9f73aaa 100644
+--- a/t/_GDT.pm
++++ b/t/_GDT.pm
+@@ -717,12 +717,15 @@ sub _compare_contents {
+     return "OPCODE mismatch" if $ahead->opcode ne $chead->opcode;
+     return "AA mismatch" if $ahead->aa != $chead->aa;
+     return "TC mismatch" if $ahead->tc != $chead->tc;
+-    return "RD mismatch" if $ahead->rd != $chead->rd;
+     return "CD mismatch" if $ahead->cd != $chead->cd;
+     return "RA mismatch" if $ahead->ra != $chead->ra;
+     return "AD mismatch" if $ahead->ad != $chead->ad;
+     return "RCODE mismatch" if $ahead->rcode ne $chead->rcode;
+     return "QDCOUNT mismatch" if $ahead->qdcount != $chead->qdcount;
++    # Skipped: Net::DNS >= 1.33 (r1855) stopped copying the RD bit from the
++    # question to the response.
++    #return "RD mismatch" if $ahead->rd != $chead->rd;
++    #
+     # These are skipped now because:
+     # (a) They should be redundant to the more complex checks below, and
+     # (b) They get really screwed up in the presence of $limit_v[46],
