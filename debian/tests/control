@@ -1,11 +1,21 @@
+# Check whether systemd is running the daemon.
+#
+# Marked as flaky, because in Ubuntu, systemd-resolved is installed by default,
+# having control over port 53, and preventing gdnsd from starting
 Tests: daemon
 Depends: @
-Restrictions: isolation-container, needs-root
+Restrictions: isolation-container, needs-root, flaky
 
+# Run some queries against the running daemon using dig
+#
+# Marked skippable, to abort if gdnsd is not running.
 Tests: common-operations
 Depends: @, bind9-dnsutils
-Restrictions: isolation-container, needs-root
+Restrictions: isolation-container, needs-root, skippable
 
+# Run the upstream testsuite, using the installed version.
+#
+# Does not rely on the init system to be running the daemon, or on port 53.
 Tests: testsuite
 Depends: @, @builddeps@
 Restrictions: isolation-container, allow-stderr

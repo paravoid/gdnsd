@@ -2,6 +2,11 @@
 
 set -e
 
+if ! pidof -x gdnsd > /dev/null; then
+    echo "Test skipped, gdnsd is not running"
+    exit 77
+fi
+
 DIGOPTS="+short +timeout=1 +norec @127.0.0.1"
 
 if dig $DIGOPTS version.bind chaos | grep -q gdnsd; then
