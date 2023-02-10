@@ -2,7 +2,7 @@ gdnsd (3.8.0-1) unstable; urgency=high
 
   * New upstream release, with various optimizations and QA fixes.
   * Add three upstream patches to the test suite, to fix compatibility with
-    Net::DNS > 1.32, and specifically API breakages introduced with 1.32 and
+    Net::DNS > 1.32, and specifically API breakages introduced with 1.33 and
     1.36. Resolves a long-standing FTBFS. (Closes: #1002225)
   * Add an upstream patch to the test suite to resolve races while tailing
     gdnsd.out, that manifested in random failures for several tests.
