@@ -1,8 +1,5 @@
 # no init.d support in the package (systemd only)
-gdnsd: package-supports-alternative-init-but-no-init.d-script lib/systemd/system/gdnsd.service
-
-# used to be separate plugins, nowadays merged in the same binary but separate man
-gdnsd: spare-manual-page usr/share/man/man8/gdnsd-plugin-*.8.gz
+gdnsd: package-supports-alternative-init-but-no-init.d-script *
 
 # false positive
-gdnsd: typo-in-manual-page usr/share/man/man5/gdnsd.config.5.gz "allow to" "allow one to"
+gdnsd: typo-in-manual-page "allow to" "allow one to" *usr/share/man/man5/gdnsd.config.5*
