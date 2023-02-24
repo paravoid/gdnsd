@@ -619,7 +619,7 @@ static void val_destroy(vscf_data_t* d)
 // *INDENT-OFF*
 // start-sonar-exclude
 
-#line 623 "libgdnsd/vscf.c"
+#line 620 "libgdnsd/vscf.c"
 static const char _vscf_actions[] = {
 	0, 1, 0, 1, 1, 1, 2, 1, 
 	3, 1, 4, 1, 5, 1, 6, 1, 
@@ -1311,7 +1311,7 @@ vscf_data_t* vscf_scan_buf(const size_t len, const char* buf, const char* source
 GDNSD_DIAG_PUSH_IGNORED("-Wswitch-default")
 GDNSD_DIAG_PUSH_IGNORED("-Wsign-conversion")
     
-#line 1315 "libgdnsd/vscf.c"
+#line 1306 "libgdnsd/vscf.c"
 	{
 	int _klen;
 	unsigned int _trans;
@@ -1482,7 +1482,7 @@ _match:
             {(     scnr->p)++; goto _out; }
     }
 	break;
-#line 1486 "libgdnsd/vscf.c"
+#line 1463 "libgdnsd/vscf.c"
 		}
 	}
 
@@ -1517,7 +1517,7 @@ _again:
 #line 651 "./libgdnsd/vscf.rl"
 	{ scnr->lcount++; }
 	break;
-#line 1521 "libgdnsd/vscf.c"
+#line 1494 "libgdnsd/vscf.c"
 		}
 	}
 	}

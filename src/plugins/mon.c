@@ -98,7 +98,7 @@ static ev_timer sttl_update_timer;
 #define DEF_INTERVAL 10
 
 F_NONNULL
-static void sttl_table_update(struct ev_loop* loop V_UNUSED, ev_timer* w V_UNUSED, int revents V_UNUSED)
+static void sttl_table_update(struct ev_loop* loop V_UNUSED, ev_timer* w V_UNUSED, int revents V_UNUSED) // cppcheck-suppress constParameter
 {
     gdnsd_assert(w == &sttl_update_timer);
     gdnsd_assert(revents == EV_TIMER);
@@ -608,7 +608,7 @@ unsigned gdnsd_mon_admin(const char* desc)
         } \
     } while (0)
 
-F_NONNULL
+F_NONNULL F_NORETURN
 static bool bad_svc_opt(const char* key, unsigned klen V_UNUSED, vscf_data_t* d V_UNUSED, const void* svcname_asvoid)
 {
     const char* svcname = svcname_asvoid;

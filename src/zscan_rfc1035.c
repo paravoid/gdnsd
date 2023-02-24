@@ -845,7 +845,7 @@ static void preprocess_buf(zscan_t* z, char* buf, const size_t buflen)
 // *INDENT-OFF*
 // start-sonar-exclude
 
-#line 849 "src/zscan_rfc1035.c"
+#line 846 "src/zscan_rfc1035.c"
 static const int zone_start = 405;
 static const int zone_first_final = 405;
 static const int zone_error = 0;
@@ -888,7 +888,7 @@ static void scanner(zscan_t* z, char* buf, const size_t bufsize)
     const char* pe = buf + bufsize;
     const char* eof = pe;
     
-#line 892 "src/zscan_rfc1035.c"
+#line 885 "src/zscan_rfc1035.c"
 	{
 	if ( p == pe )
 		goto _test_eof;
@@ -926,7 +926,7 @@ st1:
 	if ( ++p == pe )
 		goto _test_eof1;
 case 1:
-#line 930 "src/zscan_rfc1035.c"
+#line 918 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr1;
 		case 10: goto st0;
@@ -961,7 +961,7 @@ st2:
 	if ( ++p == pe )
 		goto _test_eof2;
 case 2:
-#line 965 "src/zscan_rfc1035.c"
+#line 947 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st2;
 		case 12: goto st3;
@@ -1013,7 +1013,7 @@ st3:
 	if ( ++p == pe )
 		goto _test_eof3;
 case 3:
-#line 1017 "src/zscan_rfc1035.c"
+#line 993 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr17;
 		case 12: goto tr18;
@@ -1062,7 +1062,7 @@ st4:
 	if ( ++p == pe )
 		goto _test_eof4;
 case 4:
-#line 1066 "src/zscan_rfc1035.c"
+#line 1034 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr29;
 		case 12: goto tr30;
@@ -1106,7 +1106,7 @@ st5:
 	if ( ++p == pe )
 		goto _test_eof5;
 case 5:
-#line 1110 "src/zscan_rfc1035.c"
+#line 1069 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st5;
 		case 12: goto st6;
@@ -1157,7 +1157,7 @@ st6:
 	if ( ++p == pe )
 		goto _test_eof6;
 case 6:
-#line 1161 "src/zscan_rfc1035.c"
+#line 1111 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr45;
 		case 12: goto tr46;
@@ -1200,7 +1200,7 @@ st7:
 	if ( ++p == pe )
 		goto _test_eof7;
 case 7:
-#line 1204 "src/zscan_rfc1035.c"
+#line 1149 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st8;
 		case 12: goto st9;
@@ -1217,7 +1217,7 @@ st8:
 	if ( ++p == pe )
 		goto _test_eof8;
 case 8:
-#line 1221 "src/zscan_rfc1035.c"
+#line 1164 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st8;
 		case 12: goto st9;
@@ -1235,7 +1235,7 @@ st9:
 	if ( ++p == pe )
 		goto _test_eof9;
 case 9:
-#line 1239 "src/zscan_rfc1035.c"
+#line 1180 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr60;
 		case 12: goto tr61;
@@ -1259,7 +1259,7 @@ st10:
 	if ( ++p == pe )
 		goto _test_eof10;
 case 10:
-#line 1263 "src/zscan_rfc1035.c"
+#line 1200 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr63;
 		case 10: goto tr64;
@@ -1531,7 +1531,7 @@ st11:
 	if ( ++p == pe )
 		goto _test_eof11;
 case 11:
-#line 1535 "src/zscan_rfc1035.c"
+#line 1385 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st11;
 		case 10: goto st406;
@@ -1870,7 +1870,7 @@ st406:
 	if ( ++p == pe )
 		goto _test_eof406;
 case 406:
-#line 1874 "src/zscan_rfc1035.c"
+#line 1614 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr1031;
 		case 10: goto tr1032;
@@ -1896,7 +1896,7 @@ st12:
 	if ( ++p == pe )
 		goto _test_eof12;
 case 12:
-#line 1900 "src/zscan_rfc1035.c"
+#line 1637 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st12;
 		case 10: goto st406;
@@ -1936,7 +1936,7 @@ st13:
 	if ( ++p == pe )
 		goto _test_eof13;
 case 13:
-#line 1940 "src/zscan_rfc1035.c"
+#line 1674 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr72;
 		case 10: goto tr73;
@@ -1982,7 +1982,7 @@ st14:
 	if ( ++p == pe )
 		goto _test_eof14;
 case 14:
-#line 1986 "src/zscan_rfc1035.c"
+#line 1715 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 65: goto st15;
 		case 78: goto st37;
@@ -2017,7 +2017,7 @@ st17:
 	if ( ++p == pe )
 		goto _test_eof17;
 case 17:
-#line 2021 "src/zscan_rfc1035.c"
+#line 1748 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st17;
 		case 12: goto st18;
@@ -2034,7 +2034,7 @@ st18:
 	if ( ++p == pe )
 		goto _test_eof18;
 case 18:
-#line 2038 "src/zscan_rfc1035.c"
+#line 1763 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr81;
 		case 12: goto tr82;
@@ -2057,7 +2057,7 @@ st19:
 	if ( ++p == pe )
 		goto _test_eof19;
 case 19:
-#line 2061 "src/zscan_rfc1035.c"
+#line 1782 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr84;
 		case 12: goto tr85;
@@ -2078,7 +2078,7 @@ st20:
 	if ( ++p == pe )
 		goto _test_eof20;
 case 20:
-#line 2082 "src/zscan_rfc1035.c"
+#line 1800 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st20;
 		case 12: goto st21;
@@ -2105,7 +2105,7 @@ st21:
 	if ( ++p == pe )
 		goto _test_eof21;
 case 21:
-#line 2109 "src/zscan_rfc1035.c"
+#line 1824 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr90;
 		case 12: goto tr91;
@@ -2134,7 +2134,7 @@ st22:
 	if ( ++p == pe )
 		goto _test_eof22;
 case 22:
-#line 2138 "src/zscan_rfc1035.c"
+#line 1849 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr93;
 		case 12: goto tr94;
@@ -2161,7 +2161,7 @@ st23:
 	if ( ++p == pe )
 		goto _test_eof23;
 case 23:
-#line 2165 "src/zscan_rfc1035.c"
+#line 1873 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st23;
 		case 10: goto st0;
@@ -2196,7 +2196,7 @@ st24:
 	if ( ++p == pe )
 		goto _test_eof24;
 case 24:
-#line 2200 "src/zscan_rfc1035.c"
+#line 1901 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr102;
 		case 10: goto tr103;
@@ -2470,7 +2470,7 @@ st25:
 	if ( ++p == pe )
 		goto _test_eof25;
 case 25:
-#line 2474 "src/zscan_rfc1035.c"
+#line 2088 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr106;
 		case 10: goto tr73;
@@ -2500,7 +2500,7 @@ st26:
 	if ( ++p == pe )
 		goto _test_eof26;
 case 26:
-#line 2504 "src/zscan_rfc1035.c"
+#line 2111 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st27;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -2548,7 +2548,7 @@ st30:
 	if ( ++p == pe )
 		goto _test_eof30;
 case 30:
-#line 2552 "src/zscan_rfc1035.c"
+#line 2156 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr117;
 		case 10: goto st0;
@@ -2583,7 +2583,7 @@ st31:
 	if ( ++p == pe )
 		goto _test_eof31;
 case 31:
-#line 2587 "src/zscan_rfc1035.c"
+#line 2184 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto st32;
 		case 34: goto st33;
@@ -2598,7 +2598,7 @@ st32:
 	if ( ++p == pe )
 		goto _test_eof32;
 case 32:
-#line 2602 "src/zscan_rfc1035.c"
+#line 2197 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto tr126;
 		case 34: goto tr127;
@@ -2613,7 +2613,7 @@ st33:
 	if ( ++p == pe )
 		goto _test_eof33;
 case 33:
-#line 2617 "src/zscan_rfc1035.c"
+#line 2210 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr129;
 		case 10: goto tr130;
@@ -2629,7 +2629,7 @@ st34:
 	if ( ++p == pe )
 		goto _test_eof34;
 case 34:
-#line 2633 "src/zscan_rfc1035.c"
+#line 2224 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st32;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -2694,7 +2694,7 @@ st41:
 	if ( ++p == pe )
 		goto _test_eof41;
 case 41:
-#line 2698 "src/zscan_rfc1035.c"
+#line 2287 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st41;
 		case 10: goto st0;
@@ -2726,7 +2726,7 @@ st42:
 	if ( ++p == pe )
 		goto _test_eof42;
 case 42:
-#line 2730 "src/zscan_rfc1035.c"
+#line 2314 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr143;
 		case 10: goto tr144;
@@ -2757,7 +2757,7 @@ st43:
 	if ( ++p == pe )
 		goto _test_eof43;
 case 43:
-#line 2761 "src/zscan_rfc1035.c"
+#line 2340 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st44;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -2801,7 +2801,7 @@ st47:
 	if ( ++p == pe )
 		goto _test_eof47;
 case 47:
-#line 2805 "src/zscan_rfc1035.c"
+#line 2382 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr156;
 		case 10: goto st0;
@@ -2833,7 +2833,7 @@ st48:
 	if ( ++p == pe )
 		goto _test_eof48;
 case 48:
-#line 2837 "src/zscan_rfc1035.c"
+#line 2409 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto st49;
 		case 34: goto st50;
@@ -2848,7 +2848,7 @@ st49:
 	if ( ++p == pe )
 		goto _test_eof49;
 case 49:
-#line 2852 "src/zscan_rfc1035.c"
+#line 2422 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto tr165;
 		case 34: goto tr166;
@@ -2863,7 +2863,7 @@ st50:
 	if ( ++p == pe )
 		goto _test_eof50;
 case 50:
-#line 2867 "src/zscan_rfc1035.c"
+#line 2435 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr168;
 		case 10: goto tr169;
@@ -2879,7 +2879,7 @@ st51:
 	if ( ++p == pe )
 		goto _test_eof51;
 case 51:
-#line 2883 "src/zscan_rfc1035.c"
+#line 2449 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st49;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -2917,7 +2917,7 @@ st54:
 	if ( ++p == pe )
 		goto _test_eof54;
 case 54:
-#line 2921 "src/zscan_rfc1035.c"
+#line 2482 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 89: goto st55;
 		case 121: goto st55;
@@ -2961,7 +2961,7 @@ st58:
 	if ( ++p == pe )
 		goto _test_eof58;
 case 58:
-#line 2965 "src/zscan_rfc1035.c"
+#line 2524 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st58;
 		case 10: goto st0;
@@ -2994,7 +2994,7 @@ st59:
 	if ( ++p == pe )
 		goto _test_eof59;
 case 59:
-#line 2998 "src/zscan_rfc1035.c"
+#line 2552 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr182;
 		case 10: goto tr183;
@@ -3016,7 +3016,7 @@ st60:
 	if ( ++p == pe )
 		goto _test_eof60;
 case 60:
-#line 3020 "src/zscan_rfc1035.c"
+#line 2572 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 12: goto st0;
 		case 59: goto st0;
@@ -3039,7 +3039,7 @@ st61:
 	if ( ++p == pe )
 		goto _test_eof61;
 case 61:
-#line 3043 "src/zscan_rfc1035.c"
+#line 2593 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr182;
 		case 10: goto tr183;
@@ -3062,7 +3062,7 @@ st62:
 	if ( ++p == pe )
 		goto _test_eof62;
 case 62:
-#line 3066 "src/zscan_rfc1035.c"
+#line 2614 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st63;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -3118,7 +3118,7 @@ st66:
 	if ( ++p == pe )
 		goto _test_eof66;
 case 66:
-#line 3122 "src/zscan_rfc1035.c"
+#line 2665 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st67;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -3163,7 +3163,7 @@ st70:
 	if ( ++p == pe )
 		goto _test_eof70;
 case 70:
-#line 3167 "src/zscan_rfc1035.c"
+#line 2708 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr204;
 		case 10: goto st0;
@@ -3196,7 +3196,7 @@ st72:
 	if ( ++p == pe )
 		goto _test_eof72;
 case 72:
-#line 3200 "src/zscan_rfc1035.c"
+#line 2739 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st72;
 		case 10: goto st0;
@@ -3229,7 +3229,7 @@ st73:
 	if ( ++p == pe )
 		goto _test_eof73;
 case 73:
-#line 3233 "src/zscan_rfc1035.c"
+#line 2767 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr212;
 		case 10: goto tr213;
@@ -3251,7 +3251,7 @@ st74:
 	if ( ++p == pe )
 		goto _test_eof74;
 case 74:
-#line 3255 "src/zscan_rfc1035.c"
+#line 2787 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 12: goto st0;
 		case 59: goto st0;
@@ -3274,7 +3274,7 @@ st75:
 	if ( ++p == pe )
 		goto _test_eof75;
 case 75:
-#line 3278 "src/zscan_rfc1035.c"
+#line 2808 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr212;
 		case 10: goto tr213;
@@ -3297,7 +3297,7 @@ st76:
 	if ( ++p == pe )
 		goto _test_eof76;
 case 76:
-#line 3301 "src/zscan_rfc1035.c"
+#line 2829 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st77;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -3353,7 +3353,7 @@ st80:
 	if ( ++p == pe )
 		goto _test_eof80;
 case 80:
-#line 3357 "src/zscan_rfc1035.c"
+#line 2880 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st81;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -3398,7 +3398,7 @@ st84:
 	if ( ++p == pe )
 		goto _test_eof84;
 case 84:
-#line 3402 "src/zscan_rfc1035.c"
+#line 2923 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr234;
 		case 10: goto st0;
@@ -3431,7 +3431,7 @@ st85:
 	if ( ++p == pe )
 		goto _test_eof85;
 case 85:
-#line 3435 "src/zscan_rfc1035.c"
+#line 2950 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 78: goto st86;
 		case 110: goto st86;
@@ -3455,7 +3455,7 @@ st87:
 	if ( ++p == pe )
 		goto _test_eof87;
 case 87:
-#line 3459 "src/zscan_rfc1035.c"
+#line 2972 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st87;
 		case 12: goto st88;
@@ -3488,7 +3488,7 @@ st88:
 	if ( ++p == pe )
 		goto _test_eof88;
 case 88:
-#line 3492 "src/zscan_rfc1035.c"
+#line 3003 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr241;
 		case 12: goto tr242;
@@ -3527,7 +3527,7 @@ st89:
 	if ( ++p == pe )
 		goto _test_eof89;
 case 89:
-#line 3531 "src/zscan_rfc1035.c"
+#line 3038 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr244;
 		case 12: goto tr245;
@@ -3571,7 +3571,7 @@ st90:
 	if ( ++p == pe )
 		goto _test_eof90;
 case 90:
-#line 3575 "src/zscan_rfc1035.c"
+#line 3073 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st90;
 		case 12: goto st91;
@@ -3620,7 +3620,7 @@ st91:
 	if ( ++p == pe )
 		goto _test_eof91;
 case 91:
-#line 3624 "src/zscan_rfc1035.c"
+#line 3113 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr251;
 		case 12: goto tr252;
@@ -3661,7 +3661,7 @@ st92:
 	if ( ++p == pe )
 		goto _test_eof92;
 case 92:
-#line 3665 "src/zscan_rfc1035.c"
+#line 3149 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 88: goto st93;
 		case 120: goto st93;
@@ -3685,7 +3685,7 @@ st94:
 	if ( ++p == pe )
 		goto _test_eof94;
 case 94:
-#line 3689 "src/zscan_rfc1035.c"
+#line 3171 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st94;
 		case 12: goto st95;
@@ -3702,7 +3702,7 @@ st95:
 	if ( ++p == pe )
 		goto _test_eof95;
 case 95:
-#line 3706 "src/zscan_rfc1035.c"
+#line 3186 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr257;
 		case 12: goto tr258;
@@ -3725,7 +3725,7 @@ st96:
 	if ( ++p == pe )
 		goto _test_eof96;
 case 96:
-#line 3729 "src/zscan_rfc1035.c"
+#line 3205 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr260;
 		case 12: goto tr261;
@@ -3746,7 +3746,7 @@ st97:
 	if ( ++p == pe )
 		goto _test_eof97;
 case 97:
-#line 3750 "src/zscan_rfc1035.c"
+#line 3223 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st97;
 		case 10: goto st0;
@@ -3778,7 +3778,7 @@ st98:
 	if ( ++p == pe )
 		goto _test_eof98;
 case 98:
-#line 3782 "src/zscan_rfc1035.c"
+#line 3250 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr269;
 		case 10: goto tr270;
@@ -3809,7 +3809,7 @@ st99:
 	if ( ++p == pe )
 		goto _test_eof99;
 case 99:
-#line 3813 "src/zscan_rfc1035.c"
+#line 3276 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st100;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -3857,7 +3857,7 @@ st103:
 	if ( ++p == pe )
 		goto _test_eof103;
 case 103:
-#line 3861 "src/zscan_rfc1035.c"
+#line 3321 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr282;
 		case 10: goto st0;
@@ -3889,7 +3889,7 @@ st104:
 	if ( ++p == pe )
 		goto _test_eof104;
 case 104:
-#line 3893 "src/zscan_rfc1035.c"
+#line 3348 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto st105;
 		case 34: goto st106;
@@ -3904,7 +3904,7 @@ st105:
 	if ( ++p == pe )
 		goto _test_eof105;
 case 105:
-#line 3908 "src/zscan_rfc1035.c"
+#line 3361 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto tr291;
 		case 34: goto tr292;
@@ -3919,7 +3919,7 @@ st106:
 	if ( ++p == pe )
 		goto _test_eof106;
 case 106:
-#line 3923 "src/zscan_rfc1035.c"
+#line 3374 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr294;
 		case 10: goto tr295;
@@ -3935,7 +3935,7 @@ st107:
 	if ( ++p == pe )
 		goto _test_eof107;
 case 107:
-#line 3939 "src/zscan_rfc1035.c"
+#line 3388 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st105;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -3973,7 +3973,7 @@ st110:
 	if ( ++p == pe )
 		goto _test_eof110;
 case 110:
-#line 3977 "src/zscan_rfc1035.c"
+#line 3421 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 65: goto st111;
 		case 83: goto st173;
@@ -4026,7 +4026,7 @@ st115:
 	if ( ++p == pe )
 		goto _test_eof115;
 case 115:
-#line 4030 "src/zscan_rfc1035.c"
+#line 3472 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st115;
 		case 12: goto st116;
@@ -4043,7 +4043,7 @@ st116:
 	if ( ++p == pe )
 		goto _test_eof116;
 case 116:
-#line 4047 "src/zscan_rfc1035.c"
+#line 3487 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr307;
 		case 12: goto tr308;
@@ -4066,7 +4066,7 @@ st117:
 	if ( ++p == pe )
 		goto _test_eof117;
 case 117:
-#line 4070 "src/zscan_rfc1035.c"
+#line 3506 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr310;
 		case 12: goto tr311;
@@ -4089,7 +4089,7 @@ st118:
 	if ( ++p == pe )
 		goto _test_eof118;
 case 118:
-#line 4093 "src/zscan_rfc1035.c"
+#line 3525 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st118;
 		case 12: goto st119;
@@ -4112,7 +4112,7 @@ st119:
 	if ( ++p == pe )
 		goto _test_eof119;
 case 119:
-#line 4116 "src/zscan_rfc1035.c"
+#line 3544 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr316;
 		case 12: goto tr317;
@@ -4135,7 +4135,7 @@ st120:
 	if ( ++p == pe )
 		goto _test_eof120;
 case 120:
-#line 4139 "src/zscan_rfc1035.c"
+#line 3563 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr319;
 		case 12: goto tr320;
@@ -4158,7 +4158,7 @@ st121:
 	if ( ++p == pe )
 		goto _test_eof121;
 case 121:
-#line 4162 "src/zscan_rfc1035.c"
+#line 3582 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st121;
 		case 10: goto st0;
@@ -4193,7 +4193,7 @@ st122:
 	if ( ++p == pe )
 		goto _test_eof122;
 case 122:
-#line 4197 "src/zscan_rfc1035.c"
+#line 3610 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr328;
 		case 10: goto st0;
@@ -4228,7 +4228,7 @@ st123:
 	if ( ++p == pe )
 		goto _test_eof123;
 case 123:
-#line 4232 "src/zscan_rfc1035.c"
+#line 3639 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st123;
 		case 10: goto st0;
@@ -4259,7 +4259,7 @@ st124:
 	if ( ++p == pe )
 		goto _test_eof124;
 case 124:
-#line 4263 "src/zscan_rfc1035.c"
+#line 3665 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr337;
 		case 10: goto st0;
@@ -4294,7 +4294,7 @@ st125:
 	if ( ++p == pe )
 		goto _test_eof125;
 case 125:
-#line 4298 "src/zscan_rfc1035.c"
+#line 3694 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st125;
 		case 10: goto st0;
@@ -4325,7 +4325,7 @@ st126:
 	if ( ++p == pe )
 		goto _test_eof126;
 case 126:
-#line 4329 "src/zscan_rfc1035.c"
+#line 3720 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr346;
 		case 10: goto st0;
@@ -4360,7 +4360,7 @@ st127:
 	if ( ++p == pe )
 		goto _test_eof127;
 case 127:
-#line 4364 "src/zscan_rfc1035.c"
+#line 3749 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st127;
 		case 10: goto st0;
@@ -4392,7 +4392,7 @@ st128:
 	if ( ++p == pe )
 		goto _test_eof128;
 case 128:
-#line 4396 "src/zscan_rfc1035.c"
+#line 3776 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr355;
 		case 10: goto tr356;
@@ -4423,7 +4423,7 @@ st129:
 	if ( ++p == pe )
 		goto _test_eof129;
 case 129:
-#line 4427 "src/zscan_rfc1035.c"
+#line 3802 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st130;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -4481,7 +4481,7 @@ st133:
 	if ( ++p == pe )
 		goto _test_eof133;
 case 133:
-#line 4485 "src/zscan_rfc1035.c"
+#line 3854 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr368;
 		case 10: goto st0;
@@ -4513,7 +4513,7 @@ st134:
 	if ( ++p == pe )
 		goto _test_eof134;
 case 134:
-#line 4517 "src/zscan_rfc1035.c"
+#line 3881 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto st135;
 		case 34: goto st136;
@@ -4528,7 +4528,7 @@ st135:
 	if ( ++p == pe )
 		goto _test_eof135;
 case 135:
-#line 4532 "src/zscan_rfc1035.c"
+#line 3894 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto tr377;
 		case 34: goto tr378;
@@ -4543,7 +4543,7 @@ st136:
 	if ( ++p == pe )
 		goto _test_eof136;
 case 136:
-#line 4547 "src/zscan_rfc1035.c"
+#line 3907 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr380;
 		case 10: goto tr381;
@@ -4559,7 +4559,7 @@ st137:
 	if ( ++p == pe )
 		goto _test_eof137;
 case 137:
-#line 4563 "src/zscan_rfc1035.c"
+#line 3921 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st135;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -4597,7 +4597,7 @@ st140:
 	if ( ++p == pe )
 		goto _test_eof140;
 case 140:
-#line 4601 "src/zscan_rfc1035.c"
+#line 3954 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st141;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -4655,7 +4655,7 @@ st144:
 	if ( ++p == pe )
 		goto _test_eof144;
 case 144:
-#line 4659 "src/zscan_rfc1035.c"
+#line 4006 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr393;
 		case 10: goto st0;
@@ -4686,7 +4686,7 @@ st145:
 	if ( ++p == pe )
 		goto _test_eof145;
 case 145:
-#line 4690 "src/zscan_rfc1035.c"
+#line 4032 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto st146;
 		case 34: goto st147;
@@ -4701,7 +4701,7 @@ st146:
 	if ( ++p == pe )
 		goto _test_eof146;
 case 146:
-#line 4705 "src/zscan_rfc1035.c"
+#line 4045 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto tr402;
 		case 34: goto tr403;
@@ -4716,7 +4716,7 @@ st147:
 	if ( ++p == pe )
 		goto _test_eof147;
 case 147:
-#line 4720 "src/zscan_rfc1035.c"
+#line 4058 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr405;
 		case 12: goto tr406;
@@ -4731,7 +4731,7 @@ st148:
 	if ( ++p == pe )
 		goto _test_eof148;
 case 148:
-#line 4735 "src/zscan_rfc1035.c"
+#line 4071 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st146;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -4769,7 +4769,7 @@ st151:
 	if ( ++p == pe )
 		goto _test_eof151;
 case 151:
-#line 4773 "src/zscan_rfc1035.c"
+#line 4104 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st152;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -4827,7 +4827,7 @@ st155:
 	if ( ++p == pe )
 		goto _test_eof155;
 case 155:
-#line 4831 "src/zscan_rfc1035.c"
+#line 4156 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr417;
 		case 10: goto st0;
@@ -4858,7 +4858,7 @@ st156:
 	if ( ++p == pe )
 		goto _test_eof156;
 case 156:
-#line 4862 "src/zscan_rfc1035.c"
+#line 4182 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto st157;
 		case 34: goto st158;
@@ -4873,7 +4873,7 @@ st157:
 	if ( ++p == pe )
 		goto _test_eof157;
 case 157:
-#line 4877 "src/zscan_rfc1035.c"
+#line 4195 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto tr426;
 		case 34: goto tr427;
@@ -4888,7 +4888,7 @@ st158:
 	if ( ++p == pe )
 		goto _test_eof158;
 case 158:
-#line 4892 "src/zscan_rfc1035.c"
+#line 4208 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr429;
 		case 12: goto tr430;
@@ -4903,7 +4903,7 @@ st159:
 	if ( ++p == pe )
 		goto _test_eof159;
 case 159:
-#line 4907 "src/zscan_rfc1035.c"
+#line 4221 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st157;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -4945,7 +4945,7 @@ st162:
 	if ( ++p == pe )
 		goto _test_eof162;
 case 162:
-#line 4949 "src/zscan_rfc1035.c"
+#line 4256 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st163;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -4995,7 +4995,7 @@ st166:
 	if ( ++p == pe )
 		goto _test_eof166;
 case 166:
-#line 4999 "src/zscan_rfc1035.c"
+#line 4302 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr441;
 		case 10: goto st0;
@@ -5030,7 +5030,7 @@ st167:
 	if ( ++p == pe )
 		goto _test_eof167;
 case 167:
-#line 5034 "src/zscan_rfc1035.c"
+#line 4330 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto st168;
 		case 34: goto st169;
@@ -5045,7 +5045,7 @@ st168:
 	if ( ++p == pe )
 		goto _test_eof168;
 case 168:
-#line 5049 "src/zscan_rfc1035.c"
+#line 4343 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto tr450;
 		case 34: goto tr451;
@@ -5060,7 +5060,7 @@ st169:
 	if ( ++p == pe )
 		goto _test_eof169;
 case 169:
-#line 5064 "src/zscan_rfc1035.c"
+#line 4356 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr453;
 		case 12: goto tr454;
@@ -5075,7 +5075,7 @@ st170:
 	if ( ++p == pe )
 		goto _test_eof170;
 case 170:
-#line 5079 "src/zscan_rfc1035.c"
+#line 4369 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st168;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -5113,7 +5113,7 @@ st174:
 	if ( ++p == pe )
 		goto _test_eof174;
 case 174:
-#line 5117 "src/zscan_rfc1035.c"
+#line 4405 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st174;
 		case 10: goto st0;
@@ -5145,7 +5145,7 @@ st175:
 	if ( ++p == pe )
 		goto _test_eof175;
 case 175:
-#line 5149 "src/zscan_rfc1035.c"
+#line 4432 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr463;
 		case 10: goto tr464;
@@ -5176,7 +5176,7 @@ st176:
 	if ( ++p == pe )
 		goto _test_eof176;
 case 176:
-#line 5180 "src/zscan_rfc1035.c"
+#line 4458 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st177;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -5220,7 +5220,7 @@ st180:
 	if ( ++p == pe )
 		goto _test_eof180;
 case 180:
-#line 5224 "src/zscan_rfc1035.c"
+#line 4500 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr476;
 		case 10: goto st0;
@@ -5252,7 +5252,7 @@ st181:
 	if ( ++p == pe )
 		goto _test_eof181;
 case 181:
-#line 5256 "src/zscan_rfc1035.c"
+#line 4527 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto st182;
 		case 34: goto st183;
@@ -5267,7 +5267,7 @@ st182:
 	if ( ++p == pe )
 		goto _test_eof182;
 case 182:
-#line 5271 "src/zscan_rfc1035.c"
+#line 4540 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto tr485;
 		case 34: goto tr486;
@@ -5282,7 +5282,7 @@ st183:
 	if ( ++p == pe )
 		goto _test_eof183;
 case 183:
-#line 5286 "src/zscan_rfc1035.c"
+#line 4553 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr488;
 		case 10: goto tr489;
@@ -5298,7 +5298,7 @@ st184:
 	if ( ++p == pe )
 		goto _test_eof184;
 case 184:
-#line 5302 "src/zscan_rfc1035.c"
+#line 4567 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st182;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -5336,7 +5336,7 @@ st187:
 	if ( ++p == pe )
 		goto _test_eof187;
 case 187:
-#line 5340 "src/zscan_rfc1035.c"
+#line 4600 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 84: goto st188;
 		case 116: goto st188;
@@ -5369,7 +5369,7 @@ st190:
 	if ( ++p == pe )
 		goto _test_eof190;
 case 190:
-#line 5373 "src/zscan_rfc1035.c"
+#line 4631 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st190;
 		case 10: goto st0;
@@ -5401,7 +5401,7 @@ st191:
 	if ( ++p == pe )
 		goto _test_eof191;
 case 191:
-#line 5405 "src/zscan_rfc1035.c"
+#line 4658 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr501;
 		case 10: goto tr502;
@@ -5432,7 +5432,7 @@ st192:
 	if ( ++p == pe )
 		goto _test_eof192;
 case 192:
-#line 5436 "src/zscan_rfc1035.c"
+#line 4684 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st193;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -5476,7 +5476,7 @@ st196:
 	if ( ++p == pe )
 		goto _test_eof196;
 case 196:
-#line 5480 "src/zscan_rfc1035.c"
+#line 4726 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr514;
 		case 10: goto st0;
@@ -5508,7 +5508,7 @@ st197:
 	if ( ++p == pe )
 		goto _test_eof197;
 case 197:
-#line 5512 "src/zscan_rfc1035.c"
+#line 4753 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto st198;
 		case 34: goto st199;
@@ -5523,7 +5523,7 @@ st198:
 	if ( ++p == pe )
 		goto _test_eof198;
 case 198:
-#line 5527 "src/zscan_rfc1035.c"
+#line 4766 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto tr523;
 		case 34: goto tr524;
@@ -5538,7 +5538,7 @@ st199:
 	if ( ++p == pe )
 		goto _test_eof199;
 case 199:
-#line 5542 "src/zscan_rfc1035.c"
+#line 4779 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr526;
 		case 10: goto tr527;
@@ -5554,7 +5554,7 @@ st200:
 	if ( ++p == pe )
 		goto _test_eof200;
 case 200:
-#line 5558 "src/zscan_rfc1035.c"
+#line 4793 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st198;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -5592,7 +5592,7 @@ st203:
 	if ( ++p == pe )
 		goto _test_eof203;
 case 203:
-#line 5596 "src/zscan_rfc1035.c"
+#line 4826 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 79: goto st204;
 		case 82: goto st252;
@@ -5627,7 +5627,7 @@ st206:
 	if ( ++p == pe )
 		goto _test_eof206;
 case 206:
-#line 5631 "src/zscan_rfc1035.c"
+#line 4859 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st206;
 		case 10: goto st0;
@@ -5659,7 +5659,7 @@ st207:
 	if ( ++p == pe )
 		goto _test_eof207;
 case 207:
-#line 5663 "src/zscan_rfc1035.c"
+#line 4886 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr540;
 		case 10: goto st0;
@@ -5694,7 +5694,7 @@ st208:
 	if ( ++p == pe )
 		goto _test_eof208;
 case 208:
-#line 5698 "src/zscan_rfc1035.c"
+#line 4915 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st208;
 		case 10: goto st0;
@@ -5726,7 +5726,7 @@ st209:
 	if ( ++p == pe )
 		goto _test_eof209;
 case 209:
-#line 5730 "src/zscan_rfc1035.c"
+#line 4942 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr549;
 		case 10: goto st0;
@@ -5761,7 +5761,7 @@ st210:
 	if ( ++p == pe )
 		goto _test_eof210;
 case 210:
-#line 5765 "src/zscan_rfc1035.c"
+#line 4971 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st210;
 		case 12: goto st211;
@@ -5792,7 +5792,7 @@ st211:
 	if ( ++p == pe )
 		goto _test_eof211;
 case 211:
-#line 5796 "src/zscan_rfc1035.c"
+#line 4996 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr555;
 		case 12: goto tr556;
@@ -5815,7 +5815,7 @@ st212:
 	if ( ++p == pe )
 		goto _test_eof212;
 case 212:
-#line 5819 "src/zscan_rfc1035.c"
+#line 5015 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr558;
 		case 12: goto tr559;
@@ -5850,7 +5850,7 @@ st213:
 	if ( ++p == pe )
 		goto _test_eof213;
 case 213:
-#line 5854 "src/zscan_rfc1035.c"
+#line 5045 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st213;
 		case 12: goto st214;
@@ -5877,7 +5877,7 @@ st214:
 	if ( ++p == pe )
 		goto _test_eof214;
 case 214:
-#line 5881 "src/zscan_rfc1035.c"
+#line 5067 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr565;
 		case 12: goto tr566;
@@ -5900,7 +5900,7 @@ st215:
 	if ( ++p == pe )
 		goto _test_eof215;
 case 215:
-#line 5904 "src/zscan_rfc1035.c"
+#line 5086 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr568;
 		case 12: goto tr569;
@@ -5935,7 +5935,7 @@ st216:
 	if ( ++p == pe )
 		goto _test_eof216;
 case 216:
-#line 5939 "src/zscan_rfc1035.c"
+#line 5116 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st216;
 		case 12: goto st217;
@@ -5962,7 +5962,7 @@ st217:
 	if ( ++p == pe )
 		goto _test_eof217;
 case 217:
-#line 5966 "src/zscan_rfc1035.c"
+#line 5138 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr575;
 		case 12: goto tr576;
@@ -5985,7 +5985,7 @@ st218:
 	if ( ++p == pe )
 		goto _test_eof218;
 case 218:
-#line 5989 "src/zscan_rfc1035.c"
+#line 5157 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr578;
 		case 12: goto tr579;
@@ -6020,7 +6020,7 @@ st219:
 	if ( ++p == pe )
 		goto _test_eof219;
 case 219:
-#line 6024 "src/zscan_rfc1035.c"
+#line 5187 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st219;
 		case 12: goto st220;
@@ -6047,7 +6047,7 @@ st220:
 	if ( ++p == pe )
 		goto _test_eof220;
 case 220:
-#line 6051 "src/zscan_rfc1035.c"
+#line 5209 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr585;
 		case 12: goto tr586;
@@ -6070,7 +6070,7 @@ st221:
 	if ( ++p == pe )
 		goto _test_eof221;
 case 221:
-#line 6074 "src/zscan_rfc1035.c"
+#line 5228 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr588;
 		case 12: goto tr589;
@@ -6105,7 +6105,7 @@ st222:
 	if ( ++p == pe )
 		goto _test_eof222;
 case 222:
-#line 6109 "src/zscan_rfc1035.c"
+#line 5258 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st222;
 		case 12: goto st223;
@@ -6132,7 +6132,7 @@ st223:
 	if ( ++p == pe )
 		goto _test_eof223;
 case 223:
-#line 6136 "src/zscan_rfc1035.c"
+#line 5280 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr595;
 		case 12: goto tr596;
@@ -6155,7 +6155,7 @@ st224:
 	if ( ++p == pe )
 		goto _test_eof224;
 case 224:
-#line 6159 "src/zscan_rfc1035.c"
+#line 5299 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr598;
 		case 10: goto tr599;
@@ -6183,7 +6183,7 @@ st225:
 	if ( ++p == pe )
 		goto _test_eof225;
 case 225:
-#line 6187 "src/zscan_rfc1035.c"
+#line 5324 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr603;
 		case 10: goto tr604;
@@ -6201,7 +6201,7 @@ st226:
 	if ( ++p == pe )
 		goto _test_eof226;
 case 226:
-#line 6205 "src/zscan_rfc1035.c"
+#line 5339 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr606;
 		case 12: goto tr607;
@@ -6218,7 +6218,7 @@ st227:
 	if ( ++p == pe )
 		goto _test_eof227;
 case 227:
-#line 6222 "src/zscan_rfc1035.c"
+#line 5353 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr608;
 		case 12: goto tr609;
@@ -6235,7 +6235,7 @@ st228:
 	if ( ++p == pe )
 		goto _test_eof228;
 case 228:
-#line 6239 "src/zscan_rfc1035.c"
+#line 5367 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr610;
 		case 12: goto tr611;
@@ -6252,7 +6252,7 @@ st229:
 	if ( ++p == pe )
 		goto _test_eof229;
 case 229:
-#line 6256 "src/zscan_rfc1035.c"
+#line 5381 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr612;
 		case 12: goto tr613;
@@ -6277,7 +6277,7 @@ st230:
 	if ( ++p == pe )
 		goto _test_eof230;
 case 230:
-#line 6281 "src/zscan_rfc1035.c"
+#line 5401 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st231;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -6335,7 +6335,7 @@ st234:
 	if ( ++p == pe )
 		goto _test_eof234;
 case 234:
-#line 6339 "src/zscan_rfc1035.c"
+#line 5453 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr622;
 		case 10: goto st0;
@@ -6367,7 +6367,7 @@ st235:
 	if ( ++p == pe )
 		goto _test_eof235;
 case 235:
-#line 6371 "src/zscan_rfc1035.c"
+#line 5480 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto st236;
 		case 34: goto st237;
@@ -6382,7 +6382,7 @@ st236:
 	if ( ++p == pe )
 		goto _test_eof236;
 case 236:
-#line 6386 "src/zscan_rfc1035.c"
+#line 5493 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto tr631;
 		case 34: goto tr632;
@@ -6397,7 +6397,7 @@ st237:
 	if ( ++p == pe )
 		goto _test_eof237;
 case 237:
-#line 6401 "src/zscan_rfc1035.c"
+#line 5506 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr634;
 		case 12: goto tr635;
@@ -6412,7 +6412,7 @@ st238:
 	if ( ++p == pe )
 		goto _test_eof238;
 case 238:
-#line 6416 "src/zscan_rfc1035.c"
+#line 5519 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st236;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -6450,7 +6450,7 @@ st241:
 	if ( ++p == pe )
 		goto _test_eof241;
 case 241:
-#line 6454 "src/zscan_rfc1035.c"
+#line 5552 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st242;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -6494,7 +6494,7 @@ st245:
 	if ( ++p == pe )
 		goto _test_eof245;
 case 245:
-#line 6498 "src/zscan_rfc1035.c"
+#line 5594 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr646;
 		case 10: goto st0;
@@ -6526,7 +6526,7 @@ st246:
 	if ( ++p == pe )
 		goto _test_eof246;
 case 246:
-#line 6530 "src/zscan_rfc1035.c"
+#line 5621 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto st247;
 		case 34: goto st248;
@@ -6541,7 +6541,7 @@ st247:
 	if ( ++p == pe )
 		goto _test_eof247;
 case 247:
-#line 6545 "src/zscan_rfc1035.c"
+#line 5634 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto tr655;
 		case 34: goto tr656;
@@ -6556,7 +6556,7 @@ st248:
 	if ( ++p == pe )
 		goto _test_eof248;
 case 248:
-#line 6560 "src/zscan_rfc1035.c"
+#line 5647 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr658;
 		case 12: goto tr659;
@@ -6571,7 +6571,7 @@ st249:
 	if ( ++p == pe )
 		goto _test_eof249;
 case 249:
-#line 6575 "src/zscan_rfc1035.c"
+#line 5660 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st247;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -6618,7 +6618,7 @@ st254:
 	if ( ++p == pe )
 		goto _test_eof254;
 case 254:
-#line 6622 "src/zscan_rfc1035.c"
+#line 5705 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st254;
 		case 12: goto st255;
@@ -6635,7 +6635,7 @@ st255:
 	if ( ++p == pe )
 		goto _test_eof255;
 case 255:
-#line 6639 "src/zscan_rfc1035.c"
+#line 5720 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr666;
 		case 12: goto tr667;
@@ -6658,7 +6658,7 @@ st256:
 	if ( ++p == pe )
 		goto _test_eof256;
 case 256:
-#line 6662 "src/zscan_rfc1035.c"
+#line 5739 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr669;
 		case 12: goto tr670;
@@ -6681,7 +6681,7 @@ st257:
 	if ( ++p == pe )
 		goto _test_eof257;
 case 257:
-#line 6685 "src/zscan_rfc1035.c"
+#line 5758 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st257;
 		case 12: goto st258;
@@ -6704,7 +6704,7 @@ st258:
 	if ( ++p == pe )
 		goto _test_eof258;
 case 258:
-#line 6708 "src/zscan_rfc1035.c"
+#line 5777 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr675;
 		case 12: goto tr676;
@@ -6727,7 +6727,7 @@ st259:
 	if ( ++p == pe )
 		goto _test_eof259;
 case 259:
-#line 6731 "src/zscan_rfc1035.c"
+#line 5796 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr678;
 		case 12: goto tr679;
@@ -6750,7 +6750,7 @@ st260:
 	if ( ++p == pe )
 		goto _test_eof260;
 case 260:
-#line 6754 "src/zscan_rfc1035.c"
+#line 5815 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st260;
 		case 12: goto st261;
@@ -6773,7 +6773,7 @@ st261:
 	if ( ++p == pe )
 		goto _test_eof261;
 case 261:
-#line 6777 "src/zscan_rfc1035.c"
+#line 5834 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr684;
 		case 12: goto tr685;
@@ -6796,7 +6796,7 @@ st262:
 	if ( ++p == pe )
 		goto _test_eof262;
 case 262:
-#line 6800 "src/zscan_rfc1035.c"
+#line 5853 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr687;
 		case 12: goto tr688;
@@ -6819,7 +6819,7 @@ st263:
 	if ( ++p == pe )
 		goto _test_eof263;
 case 263:
-#line 6823 "src/zscan_rfc1035.c"
+#line 5872 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st263;
 		case 10: goto st0;
@@ -6851,7 +6851,7 @@ st264:
 	if ( ++p == pe )
 		goto _test_eof264;
 case 264:
-#line 6855 "src/zscan_rfc1035.c"
+#line 5899 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr696;
 		case 10: goto tr697;
@@ -6882,7 +6882,7 @@ st265:
 	if ( ++p == pe )
 		goto _test_eof265;
 case 265:
-#line 6886 "src/zscan_rfc1035.c"
+#line 5925 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st266;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -6932,7 +6932,7 @@ st269:
 	if ( ++p == pe )
 		goto _test_eof269;
 case 269:
-#line 6936 "src/zscan_rfc1035.c"
+#line 5971 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr709;
 		case 10: goto st0;
@@ -6964,7 +6964,7 @@ st270:
 	if ( ++p == pe )
 		goto _test_eof270;
 case 270:
-#line 6968 "src/zscan_rfc1035.c"
+#line 5998 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto st271;
 		case 34: goto st272;
@@ -6979,7 +6979,7 @@ st271:
 	if ( ++p == pe )
 		goto _test_eof271;
 case 271:
-#line 6983 "src/zscan_rfc1035.c"
+#line 6011 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto tr718;
 		case 34: goto tr719;
@@ -6994,7 +6994,7 @@ st272:
 	if ( ++p == pe )
 		goto _test_eof272;
 case 272:
-#line 6998 "src/zscan_rfc1035.c"
+#line 6024 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr721;
 		case 10: goto tr722;
@@ -7010,7 +7010,7 @@ st273:
 	if ( ++p == pe )
 		goto _test_eof273;
 case 273:
-#line 7014 "src/zscan_rfc1035.c"
+#line 6038 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st271;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -7048,7 +7048,7 @@ st276:
 	if ( ++p == pe )
 		goto _test_eof276;
 case 276:
-#line 7052 "src/zscan_rfc1035.c"
+#line 6071 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 88: goto st277;
 		case 89: goto st296;
@@ -7129,7 +7129,7 @@ st280:
 	if ( ++p == pe )
 		goto _test_eof280;
 case 280:
-#line 7133 "src/zscan_rfc1035.c"
+#line 6140 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr737;
 		case 10: goto tr738;
@@ -7164,7 +7164,7 @@ st281:
 	if ( ++p == pe )
 		goto _test_eof281;
 case 281:
-#line 7168 "src/zscan_rfc1035.c"
+#line 6169 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st281;
 		case 10: goto tr744;
@@ -7199,7 +7199,7 @@ st282:
 	if ( ++p == pe )
 		goto _test_eof282;
 case 282:
-#line 7203 "src/zscan_rfc1035.c"
+#line 6198 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr749;
 		case 10: goto tr750;
@@ -7264,7 +7264,7 @@ st283:
 	if ( ++p == pe )
 		goto _test_eof283;
 case 283:
-#line 7268 "src/zscan_rfc1035.c"
+#line 6246 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto st284;
 		case 34: goto st285;
@@ -7279,7 +7279,7 @@ st284:
 	if ( ++p == pe )
 		goto _test_eof284;
 case 284:
-#line 7283 "src/zscan_rfc1035.c"
+#line 6259 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto tr759;
 		case 34: goto tr760;
@@ -7294,7 +7294,7 @@ st285:
 	if ( ++p == pe )
 		goto _test_eof285;
 case 285:
-#line 7298 "src/zscan_rfc1035.c"
+#line 6272 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr763;
 		case 10: goto tr764;
@@ -7345,7 +7345,7 @@ st286:
 	if ( ++p == pe )
 		goto _test_eof286;
 case 286:
-#line 7349 "src/zscan_rfc1035.c"
+#line 6311 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st287;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -7389,7 +7389,7 @@ st290:
 	if ( ++p == pe )
 		goto _test_eof290;
 case 290:
-#line 7393 "src/zscan_rfc1035.c"
+#line 6353 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st284;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -7423,7 +7423,7 @@ st293:
 	if ( ++p == pe )
 		goto _test_eof293;
 case 293:
-#line 7427 "src/zscan_rfc1035.c"
+#line 6383 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr732;
 		case 10: goto tr744;
@@ -7450,7 +7450,7 @@ st294:
 	if ( ++p == pe )
 		goto _test_eof294;
 case 294:
-#line 7454 "src/zscan_rfc1035.c"
+#line 6406 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr780;
 		case 10: goto tr750;
@@ -7512,7 +7512,7 @@ st299:
 	if ( ++p == pe )
 		goto _test_eof299;
 case 299:
-#line 7516 "src/zscan_rfc1035.c"
+#line 6466 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr787;
 		case 12: goto tr788;
@@ -7535,7 +7535,7 @@ st300:
 	if ( ++p == pe )
 		goto _test_eof300;
 case 300:
-#line 7539 "src/zscan_rfc1035.c"
+#line 6485 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st300;
 		case 12: goto st301;
@@ -7557,7 +7557,7 @@ st301:
 	if ( ++p == pe )
 		goto _test_eof301;
 case 301:
-#line 7561 "src/zscan_rfc1035.c"
+#line 6503 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr793;
 		case 12: goto tr794;
@@ -7573,7 +7573,7 @@ st302:
 	if ( ++p == pe )
 		goto _test_eof302;
 case 302:
-#line 7577 "src/zscan_rfc1035.c"
+#line 6517 "src/zscan_rfc1035.c"
 	if ( (*p) == 35 )
 		goto st303;
 	goto st0;
@@ -7595,7 +7595,7 @@ st304:
 	if ( ++p == pe )
 		goto _test_eof304;
 case 304:
-#line 7599 "src/zscan_rfc1035.c"
+#line 6537 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st304;
 		case 12: goto st305;
@@ -7612,7 +7612,7 @@ st305:
 	if ( ++p == pe )
 		goto _test_eof305;
 case 305:
-#line 7616 "src/zscan_rfc1035.c"
+#line 6552 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr800;
 		case 12: goto tr801;
@@ -7635,7 +7635,7 @@ st306:
 	if ( ++p == pe )
 		goto _test_eof306;
 case 306:
-#line 7639 "src/zscan_rfc1035.c"
+#line 6571 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr803;
 		case 12: goto tr804;
@@ -7664,7 +7664,7 @@ st307:
 	if ( ++p == pe )
 		goto _test_eof307;
 case 307:
-#line 7668 "src/zscan_rfc1035.c"
+#line 6594 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr806;
 		case 10: goto tr807;
@@ -7700,7 +7700,7 @@ st308:
 	if ( ++p == pe )
 		goto _test_eof308;
 case 308:
-#line 7704 "src/zscan_rfc1035.c"
+#line 6624 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr810;
 		case 10: goto tr811;
@@ -7736,7 +7736,7 @@ st309:
 	if ( ++p == pe )
 		goto _test_eof309;
 case 309:
-#line 7740 "src/zscan_rfc1035.c"
+#line 6654 "src/zscan_rfc1035.c"
 	if ( (*p) < 65 ) {
 		if ( 48 <= (*p) && (*p) <= 57 )
 			goto st310;
@@ -7777,7 +7777,7 @@ st311:
 	if ( ++p == pe )
 		goto _test_eof311;
 case 311:
-#line 7781 "src/zscan_rfc1035.c"
+#line 6692 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st311;
 		case 10: goto tr807;
@@ -7805,7 +7805,7 @@ st312:
 	if ( ++p == pe )
 		goto _test_eof312;
 case 312:
-#line 7809 "src/zscan_rfc1035.c"
+#line 6717 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr821;
 		case 10: goto tr811;
@@ -7835,7 +7835,7 @@ st313:
 	if ( ++p == pe )
 		goto _test_eof313;
 case 313:
-#line 7839 "src/zscan_rfc1035.c"
+#line 6743 "src/zscan_rfc1035.c"
 	if ( 48 <= (*p) && (*p) <= 57 )
 		goto tr823;
 	goto st0;
@@ -7847,7 +7847,7 @@ st314:
 	if ( ++p == pe )
 		goto _test_eof314;
 case 314:
-#line 7851 "src/zscan_rfc1035.c"
+#line 6753 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr824;
 		case 12: goto tr825;
@@ -7886,7 +7886,7 @@ st315:
 	if ( ++p == pe )
 		goto _test_eof315;
 case 315:
-#line 7890 "src/zscan_rfc1035.c"
+#line 6785 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st315;
 		case 12: goto st316;
@@ -7917,7 +7917,7 @@ st316:
 	if ( ++p == pe )
 		goto _test_eof316;
 case 316:
-#line 7921 "src/zscan_rfc1035.c"
+#line 6809 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr830;
 		case 12: goto tr831;
@@ -7936,7 +7936,7 @@ st317:
 	if ( ++p == pe )
 		goto _test_eof317;
 case 317:
-#line 7940 "src/zscan_rfc1035.c"
+#line 6825 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr832;
 		case 12: goto tr833;
@@ -7953,7 +7953,7 @@ st318:
 	if ( ++p == pe )
 		goto _test_eof318;
 case 318:
-#line 7957 "src/zscan_rfc1035.c"
+#line 6839 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr834;
 		case 12: goto tr835;
@@ -7979,7 +7979,7 @@ st319:
 	if ( ++p == pe )
 		goto _test_eof319;
 case 319:
-#line 7983 "src/zscan_rfc1035.c"
+#line 6860 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto st320;
 		case 34: goto st321;
@@ -7994,7 +7994,7 @@ st320:
 	if ( ++p == pe )
 		goto _test_eof320;
 case 320:
-#line 7998 "src/zscan_rfc1035.c"
+#line 6873 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto tr842;
 		case 34: goto tr843;
@@ -8009,7 +8009,7 @@ st321:
 	if ( ++p == pe )
 		goto _test_eof321;
 case 321:
-#line 8013 "src/zscan_rfc1035.c"
+#line 6886 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr845;
 		case 12: goto tr846;
@@ -8024,7 +8024,7 @@ st322:
 	if ( ++p == pe )
 		goto _test_eof322;
 case 322:
-#line 8028 "src/zscan_rfc1035.c"
+#line 6899 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st320;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -8052,7 +8052,7 @@ st325:
 	if ( ++p == pe )
 		goto _test_eof325;
 case 325:
-#line 8056 "src/zscan_rfc1035.c"
+#line 6925 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 73: goto st326;
 		case 79: goto st359;
@@ -8138,7 +8138,7 @@ st333:
 	if ( ++p == pe )
 		goto _test_eof333;
 case 333:
-#line 8142 "src/zscan_rfc1035.c"
+#line 7008 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st333;
 		case 10: goto st0;
@@ -8169,7 +8169,7 @@ st334:
 	if ( ++p == pe )
 		goto _test_eof334;
 case 334:
-#line 8173 "src/zscan_rfc1035.c"
+#line 7034 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr866;
 		case 10: goto tr867;
@@ -8204,7 +8204,7 @@ st335:
 	if ( ++p == pe )
 		goto _test_eof335;
 case 335:
-#line 8208 "src/zscan_rfc1035.c"
+#line 7063 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st335;
 		case 10: goto st0;
@@ -8236,7 +8236,7 @@ st336:
 	if ( ++p == pe )
 		goto _test_eof336;
 case 336:
-#line 8240 "src/zscan_rfc1035.c"
+#line 7090 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr876;
 		case 10: goto tr877;
@@ -8267,7 +8267,7 @@ st337:
 	if ( ++p == pe )
 		goto _test_eof337;
 case 337:
-#line 8271 "src/zscan_rfc1035.c"
+#line 7116 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st338;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -8325,7 +8325,7 @@ st341:
 	if ( ++p == pe )
 		goto _test_eof341;
 case 341:
-#line 8329 "src/zscan_rfc1035.c"
+#line 7168 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr889;
 		case 10: goto st0;
@@ -8357,7 +8357,7 @@ st342:
 	if ( ++p == pe )
 		goto _test_eof342;
 case 342:
-#line 8361 "src/zscan_rfc1035.c"
+#line 7195 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto st343;
 		case 34: goto st344;
@@ -8372,7 +8372,7 @@ st343:
 	if ( ++p == pe )
 		goto _test_eof343;
 case 343:
-#line 8376 "src/zscan_rfc1035.c"
+#line 7208 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto tr898;
 		case 34: goto tr899;
@@ -8387,7 +8387,7 @@ st344:
 	if ( ++p == pe )
 		goto _test_eof344;
 case 344:
-#line 8391 "src/zscan_rfc1035.c"
+#line 7221 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr901;
 		case 10: goto tr902;
@@ -8403,7 +8403,7 @@ st345:
 	if ( ++p == pe )
 		goto _test_eof345;
 case 345:
-#line 8407 "src/zscan_rfc1035.c"
+#line 7235 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st343;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -8441,7 +8441,7 @@ st348:
 	if ( ++p == pe )
 		goto _test_eof348;
 case 348:
-#line 8445 "src/zscan_rfc1035.c"
+#line 7268 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st349;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -8489,7 +8489,7 @@ st352:
 	if ( ++p == pe )
 		goto _test_eof352;
 case 352:
-#line 8493 "src/zscan_rfc1035.c"
+#line 7313 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr915;
 		case 10: goto st0;
@@ -8520,7 +8520,7 @@ st353:
 	if ( ++p == pe )
 		goto _test_eof353;
 case 353:
-#line 8524 "src/zscan_rfc1035.c"
+#line 7339 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto st354;
 		case 34: goto st355;
@@ -8535,7 +8535,7 @@ st354:
 	if ( ++p == pe )
 		goto _test_eof354;
 case 354:
-#line 8539 "src/zscan_rfc1035.c"
+#line 7352 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto tr924;
 		case 34: goto tr925;
@@ -8550,7 +8550,7 @@ st355:
 	if ( ++p == pe )
 		goto _test_eof355;
 case 355:
-#line 8554 "src/zscan_rfc1035.c"
+#line 7365 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr927;
 		case 10: goto tr928;
@@ -8566,7 +8566,7 @@ st356:
 	if ( ++p == pe )
 		goto _test_eof356;
 case 356:
-#line 8570 "src/zscan_rfc1035.c"
+#line 7379 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st354;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -8649,7 +8649,7 @@ st365:
 	if ( ++p == pe )
 		goto _test_eof365;
 case 365:
-#line 8653 "src/zscan_rfc1035.c"
+#line 7460 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st365;
 		case 10: goto st0;
@@ -8681,7 +8681,7 @@ st366:
 	if ( ++p == pe )
 		goto _test_eof366;
 case 366:
-#line 8685 "src/zscan_rfc1035.c"
+#line 7487 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr943;
 		case 10: goto tr944;
@@ -8712,7 +8712,7 @@ st367:
 	if ( ++p == pe )
 		goto _test_eof367;
 case 367:
-#line 8716 "src/zscan_rfc1035.c"
+#line 7513 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st368;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -8756,7 +8756,7 @@ st371:
 	if ( ++p == pe )
 		goto _test_eof371;
 case 371:
-#line 8760 "src/zscan_rfc1035.c"
+#line 7555 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr956;
 		case 10: goto st0;
@@ -8788,7 +8788,7 @@ st372:
 	if ( ++p == pe )
 		goto _test_eof372;
 case 372:
-#line 8792 "src/zscan_rfc1035.c"
+#line 7582 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto st373;
 		case 34: goto st374;
@@ -8803,7 +8803,7 @@ st373:
 	if ( ++p == pe )
 		goto _test_eof373;
 case 373:
-#line 8807 "src/zscan_rfc1035.c"
+#line 7595 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 10: goto tr965;
 		case 34: goto tr966;
@@ -8818,7 +8818,7 @@ st374:
 	if ( ++p == pe )
 		goto _test_eof374;
 case 374:
-#line 8822 "src/zscan_rfc1035.c"
+#line 7608 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr968;
 		case 10: goto tr969;
@@ -8834,7 +8834,7 @@ st375:
 	if ( ++p == pe )
 		goto _test_eof375;
 case 375:
-#line 8838 "src/zscan_rfc1035.c"
+#line 7622 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st373;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -8890,7 +8890,7 @@ st381:
 	if ( ++p == pe )
 		goto _test_eof381;
 case 381:
-#line 8894 "src/zscan_rfc1035.c"
+#line 7676 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st381;
 		case 12: goto st382;
@@ -8907,7 +8907,7 @@ st382:
 	if ( ++p == pe )
 		goto _test_eof382;
 case 382:
-#line 8911 "src/zscan_rfc1035.c"
+#line 7691 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr978;
 		case 12: goto tr979;
@@ -8930,7 +8930,7 @@ st383:
 	if ( ++p == pe )
 		goto _test_eof383;
 case 383:
-#line 8934 "src/zscan_rfc1035.c"
+#line 7710 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr981;
 		case 10: goto tr982;
@@ -8958,7 +8958,7 @@ st384:
 	if ( ++p == pe )
 		goto _test_eof384;
 case 384:
-#line 8962 "src/zscan_rfc1035.c"
+#line 7735 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr986;
 		case 10: goto tr987;
@@ -8984,7 +8984,7 @@ st385:
 	if ( ++p == pe )
 		goto _test_eof385;
 case 385:
-#line 8988 "src/zscan_rfc1035.c"
+#line 7756 "src/zscan_rfc1035.c"
 	if ( (*p) == 10 )
 		goto st386;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -9056,7 +9056,7 @@ st392:
 	if ( ++p == pe )
 		goto _test_eof392;
 case 392:
-#line 9060 "src/zscan_rfc1035.c"
+#line 7826 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st392;
 		case 12: goto st393;
@@ -9080,7 +9080,7 @@ st393:
 	if ( ++p == pe )
 		goto _test_eof393;
 case 393:
-#line 9084 "src/zscan_rfc1035.c"
+#line 7848 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr1001;
 		case 12: goto tr1002;
@@ -9110,7 +9110,7 @@ st394:
 	if ( ++p == pe )
 		goto _test_eof394;
 case 394:
-#line 9114 "src/zscan_rfc1035.c"
+#line 7874 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr1004;
 		case 10: goto tr1005;
@@ -9135,7 +9135,7 @@ st395:
 	if ( ++p == pe )
 		goto _test_eof395;
 case 395:
-#line 9139 "src/zscan_rfc1035.c"
+#line 7897 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 78: goto st396;
 		case 110: goto st396;
@@ -9165,7 +9165,7 @@ st397:
 	if ( ++p == pe )
 		goto _test_eof397;
 case 397:
-#line 9169 "src/zscan_rfc1035.c"
+#line 7923 "src/zscan_rfc1035.c"
 	if ( 48 <= (*p) && (*p) <= 57 )
 		goto tr1009;
 	goto st0;
@@ -9177,7 +9177,7 @@ st398:
 	if ( ++p == pe )
 		goto _test_eof398;
 case 398:
-#line 9181 "src/zscan_rfc1035.c"
+#line 7933 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr1010;
 		case 12: goto tr1011;
@@ -9216,7 +9216,7 @@ st399:
 	if ( ++p == pe )
 		goto _test_eof399;
 case 399:
-#line 9220 "src/zscan_rfc1035.c"
+#line 7965 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto st399;
 		case 12: goto st400;
@@ -9249,7 +9249,7 @@ st400:
 	if ( ++p == pe )
 		goto _test_eof400;
 case 400:
-#line 9253 "src/zscan_rfc1035.c"
+#line 7991 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr1017;
 		case 12: goto tr1018;
@@ -9268,7 +9268,7 @@ st401:
 	if ( ++p == pe )
 		goto _test_eof401;
 case 401:
-#line 9272 "src/zscan_rfc1035.c"
+#line 8008 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 78: goto st402;
 		case 110: goto st402;
@@ -9294,7 +9294,7 @@ st403:
 	if ( ++p == pe )
 		goto _test_eof403;
 case 403:
-#line 9298 "src/zscan_rfc1035.c"
+#line 8031 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr1021;
 		case 12: goto tr1022;
@@ -9311,7 +9311,7 @@ st404:
 	if ( ++p == pe )
 		goto _test_eof404;
 case 404:
-#line 9315 "src/zscan_rfc1035.c"
+#line 8045 "src/zscan_rfc1035.c"
 	switch( (*p) ) {
 		case 9: goto tr1023;
 		case 12: goto tr1024;
@@ -9734,7 +9734,7 @@ case 404:
 #line 915 "./src/zscan_rfc1035.rl"
 	{ z->lcount++; }
 	break;
-#line 9738 "src/zscan_rfc1035.c"
+#line 8466 "src/zscan_rfc1035.c"
 	}
 	}
 

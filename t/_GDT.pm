@@ -32,6 +32,7 @@ use Scalar::Util qw/looks_like_number/;
 use FindBin ();
 use File::Spec ();
 use Net::DNS 1.03 ();
+use Net::DNS::Parameters qw(ednsoptionbyname);
 use Net::DNS::Resolver ();
 use Test::More ();
 use File::Copy qw//;
@@ -545,6 +546,7 @@ sub test_log_output {
     # for the $partial/$line code and \n-checking .
     my $partial = '';
     while($retry--) {
+        seek($GDOUT_FH, 0, 1);  # SEEK_CUR+0, to clear EOF
         while(scalar(keys %$texts) && ($_ = <$GDOUT_FH>)) {
             $partial .= $_;
             if($partial =~ /\n$/) {
@@ -645,6 +647,24 @@ sub get_resolver6 {
         retrans => 1,
         retry => 1,
     );
+}
+
+# Helper to sets the option for an EDNS OPT record.
+
+#  Accesses Net::DNS internals, and is used instead of the upstream
+#    $optrr->option($name => $value)
+#  ...the API for which was changed in 1.35 by packing the data internally,
+#  therefore breaking in non-backwards-compatible ways, and also not allowing
+#  us to construct invalid data (e.g. too short) as we do in our tests.
+sub optrr_option_set {
+    my ($optrr, $name, $value) = @_;
+
+    my $number;
+    # hardcode here, as this was introduced in 1.04
+    $number = 11 if $name eq 'TCP-KEEPALIVE';
+
+    $number = ednsoptionbyname($name) unless defined $number;
+    $optrr->{option}->{$number} = $value;
 }
 
 # Creates a new Net::DNS::Packet which is a query response,
@@ -824,7 +844,7 @@ sub _compare_rrsets {
                 $_lastacookie = $acookieval;
                 if ($acookielen > 8) {
                     substr($acookieval, 8, $acookielen - 8, "\x00" x ($acookielen - 8));
-                    $a_rrset->[0]->option(COOKIE => $acookieval);
+                    _GDT::optrr_option_set($a_rrset->[0], 'COOKIE', $acookieval);
                 }
             }
         }
@@ -861,7 +881,43 @@ sub _compare_rrsets {
     my $found = 0;
     for(my $i = 0; $i < scalar @$a_rrset; $i++) {
         for(my $j = 0; $j < scalar @comp_idx; $j++) {
-           if($a_rrset->[$i]->string eq $c_rrset->[$comp_idx[$j]]->string) {
+           my $a = $a_rrset->[$i];
+           my $c = $c_rrset->[$comp_idx[$j]];
+
+           # ->string output of OPT is not stable (broken in 1.36), due to the
+           #   inclusion of (unordered) hashes. Do a deep comparison instead,
+           #   comparing every option between $a and $c. Code in SVN trunk
+           #   suggests this may be fixed in later releases, but 1.36 is
+           #   found in the wild.
+           if($a->type eq 'OPT' && $c->type eq 'OPT') {
+               # bail-out early if the number of options differs
+               next unless scalar $a->options eq scalar $c->options;
+
+               my $a_matches = 0;
+               foreach my $opt ($a->options) {
+                   # check if the option is defined only in $a
+                   next unless defined $c->option($opt);
+                   # found in both, now check if they match
+                   # this is a scalar comparison, checking their binary forms
+                   next unless $a->option($opt) eq $c->option($opt);
+                   $a_matches++;
+               }
+
+               my $c_matches = 0;
+               foreach my $opt ($c->options) {
+                   # check if the option is defined only in $c
+                   next unless defined $a->option($opt);
+                   $c_matches++;
+               }
+
+               if ($a->options == $a_matches && $c->options == $c_matches) {
+                   $found++;
+                   splice(@comp_idx, $j, 1);
+                   last;
+               }
+           }
+
+           if($a->string eq $c->string) {
               $found++;
               splice(@comp_idx, $j, 1);
               last;
@@ -1051,6 +1107,7 @@ sub test_dns {
     $args{qname}    ||= '.';
     $args{qtype}    ||= 'A';
     $args{header}   ||= {};
+    $args{qheader}  ||= {};
     $args{stats}    ||= [qw/udp_reqs noerror/];
     $args{resopts}  ||= {};
     $args{limit_v4} ||= 0;
@@ -1076,6 +1133,9 @@ sub test_dns {
     my $qpacket = $args{qpacket} || Net::DNS::Packet->new($args{qname}, $args{qtype});
     if(defined $args{qid}) {
         $qpacket->header->id($args{qid});
+    }
+    foreach my $qh (keys %{$args{qheader}}) {
+        $qpacket->header->$qh($args{qheader}->{$qh});
     }
     if(defined $args{q_optrr}) {
         $qpacket->push(additional => $args{q_optrr});
@@ -1277,12 +1337,14 @@ sub optrr_clientsub {
     if(defined $args{addr_v4} || defined $args{addr_v6}) {
         my $src_mask = $args{src_mask};
         my $addr_bytes = ($src_mask >> 3) + (($src_mask & 7) ? 1 : 0);
+        my $data_ecs;
         if(defined $args{addr_v4}) {
-            $optrr->option('CLIENT-SUBNET' => pack('nCCa' . $addr_bytes, 1, $args{src_mask}, $args{scope_mask}, inet_pton(AF_INET, $args{addr_v4})));
+            $data_ecs = pack('nCCa' . $addr_bytes, 1, $args{src_mask}, $args{scope_mask}, inet_pton(AF_INET, $args{addr_v4}));
         }
         else {
-            $optrr->option('CLIENT-SUBNET' => pack('nCCa' . $addr_bytes, 2, $args{src_mask}, $args{scope_mask}, inet_pton(AF_INET6, $args{addr_v6})));
+            $data_ecs = pack('nCCa' . $addr_bytes, 2, $args{src_mask}, $args{scope_mask}, inet_pton(AF_INET6, $args{addr_v6}));
         }
+        _GDT::optrr_option_set($optrr, 'CLIENT-SUBNET', $data_ecs);
     }
 
     $optrr;
