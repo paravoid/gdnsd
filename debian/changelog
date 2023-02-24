@@ -1,3 +1,15 @@
+gdnsd (3.8.1-1) unstable; urgency=medium
+
+  * New upstream release.
+    - The test suite patches introduced in the previous release have been
+      pushed upstream (PR #229) and are now part of this release.
+  * Update upstream's signing key; upstream replaced the SHA1 signatures in
+    their key, making it more secure and now functional with dpkg.
+  * Adjust libunwind-dev's architecture set to add s390x and riscv64, as
+    introduced by libunwind 1.6.2-1.
+
+ -- Faidon Liambotis <paravoid@debian.org>  Sat, 25 Feb 2023 00:37:06 +0200
+
 gdnsd (3.8.0-1) unstable; urgency=high
 
   * New upstream release, with various optimizations and QA fixes.
