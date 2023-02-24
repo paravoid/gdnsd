@@ -71,7 +71,7 @@ static const char DEFAULT_SVCNAME[] = "up";
 /* Local, static functions       */
 /*********************************/
 
-F_NONNULL
+F_NONNULL F_NORETURN
 static bool bad_res_opt(const char* key, unsigned klen V_UNUSED, vscf_data_t* d V_UNUSED, const void* resname_asvoid)
 {
     const char* resname = resname_asvoid;
@@ -103,7 +103,7 @@ static as_af_t config_addrs(addrstate_t* as, as_af_t as_af, const char* resname,
 
     as->num_svcs = num_svcs;
 
-    res_which_t both[2] = { A_PRI, A_SEC };
+    const res_which_t both[2] = { A_PRI, A_SEC };
     for (unsigned i = 0; i < 2; i++) {
         res_which_t which = both[i];
         vscf_data_t* addrcfg = vscf_hash_get_data_bystringkey(cfg, which_str[which], true);

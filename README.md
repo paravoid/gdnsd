@@ -1,15 +1,12 @@
-[![Build Status](https://travis-ci.com/gdnsd/gdnsd.svg?branch=master)](https://travis-ci.com/github/gdnsd/gdnsd)
+[![C/C++ CI](https://github.com/gdnsd/gdnsd/actions/workflows/c-cpp.yml/badge.svg?branch=master)](https://github.com/gdnsd/gdnsd/actions/workflows/c-cpp.yml)
+[![CodeQL](https://github.com/gdnsd/gdnsd/actions/workflows/codeql.yml/badge.svg?branch=master)](https://github.com/gdnsd/gdnsd/actions/workflows/codeql.yml)
 [![Coverity Scan Build Status](https://scan.coverity.com/projects/760/badge.svg)](https://scan.coverity.com/projects/760)
-[![Total alerts](https://img.shields.io/lgtm/alerts/g/gdnsd/gdnsd.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/gdnsd/gdnsd/alerts/)
-[![Language grade: C/C++](https://img.shields.io/lgtm/grade/cpp/g/gdnsd/gdnsd.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/gdnsd/gdnsd/context:cpp)
-
 
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=gdnsd_gdnsd&metric=alert_status)](https://sonarcloud.io/dashboard?id=gdnsd_gdnsd)
 [![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=gdnsd_gdnsd&metric=sqale_rating)](https://sonarcloud.io/dashboard?id=gdnsd_gdnsd)
 [![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=gdnsd_gdnsd&metric=reliability_rating)](https://sonarcloud.io/dashboard?id=gdnsd_gdnsd)
 [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=gdnsd_gdnsd&metric=security_rating)](https://sonarcloud.io/dashboard?id=gdnsd_gdnsd)
 
-[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=gdnsd_gdnsd&metric=coverage)](https://sonarcloud.io/dashboard?id=gdnsd_gdnsd)
 [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=gdnsd_gdnsd&metric=vulnerabilities)](https://sonarcloud.io/dashboard?id=gdnsd_gdnsd)
 [![Bugs](https://sonarcloud.io/api/project_badges/measure?project=gdnsd_gdnsd&metric=bugs)](https://sonarcloud.io/dashboard?id=gdnsd_gdnsd)
 [![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=gdnsd_gdnsd&metric=code_smells)](https://sonarcloud.io/dashboard?id=gdnsd_gdnsd)
