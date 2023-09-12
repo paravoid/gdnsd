@@ -1,7 +1,7 @@
 From a395264dcc1734a930706462a380f19e3e2f389a Mon Sep 17 00:00:00 2001
 From: Faidon Liambotis <paravoid@debian.org>
 Date: Tue, 1 Aug 2023 16:52:44 +0300
-Subject: [PATCH] tests: fix AXFR-related Net::DNS 1.39 breakage
+Subject: tests: fix AXFR-related Net::DNS 1.39 breakage
 
 Net::DNS 1.39 made axfr() ignore the "persistent_tcp" setting, which
 means that the socket is closed right after the AXFR, which in turn
@@ -19,6 +19,10 @@ code to turn off persistent_tcp() before the axfr() call, and restore it
 to its previous state right after (currently always 1).
 
 Fixes #236
+
+Bug: https://github.com/gdnsd/gdnsd/issues/236
+Bug-Debian: https://bugs.debian.org/1042337
+Forwarded: https://github.com/gdnsd/gdnsd/pull/237
 ---
  t/003complex/009broken.t | 11 ++++++++++-
  1 file changed, 10 insertions(+), 1 deletion(-)
