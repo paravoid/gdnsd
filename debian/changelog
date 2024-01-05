@@ -1,3 +1,11 @@
+gdnsd (3.8.2-1) unstable; urgency=medium
+
+  * New upstream release.
+    - Drop patch tests-fix-AXFR-related-Net-DNS-1.39-breakage, merged
+      upstream.
+
+ -- Faidon Liambotis <paravoid@debian.org>  Fri, 05 Jan 2024 12:00:05 +0200
+
 gdnsd (3.8.1-2) unstable; urgency=medium
 
   * Add upstream patch (submitted as PR #237) to fix a FTBFS, with a test
