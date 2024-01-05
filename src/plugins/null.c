@@ -77,7 +77,7 @@ static void null_interval_cb(struct ev_loop* loop V_UNUSED, struct ev_timer* t, 
 {
     gdnsd_assert(revents == EV_TIMER);
 
-    null_mon_t* mon = t->data;
+    const null_mon_t* mon = t->data;
     gdnsd_assert(mon);
     gdnsd_mon_state_updater(mon->idx, false);
 }
@@ -105,7 +105,9 @@ static void add_mon_any(const char* svc_name, const unsigned idx)
         }
     }
 
-    gdnsd_assert(this_svc);
+    if (!this_svc)
+	log_fatal("plugin_null: BUG: did not find expected service_type %s", svc_name);
+
     null_mon_t* this_mon = xmalloc(sizeof(*this_mon));
     null_mons = xrealloc_n(null_mons, num_mons + 1, sizeof(*null_mons));
     null_mons[num_mons] = this_mon;

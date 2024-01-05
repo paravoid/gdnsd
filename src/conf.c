@@ -241,7 +241,7 @@ static bool cfg_plugin_iter(const char* name, unsigned namelen V_UNUSED, vscf_da
 
 #define CFG_OPT_REMOVED(_opt_set, _gconf_loc) \
     do { \
-        vscf_data_t* _opt_setting = vscf_hash_get_data_byconstkey(_opt_set, #_gconf_loc, true); \
+        const vscf_data_t* _opt_setting = vscf_hash_get_data_byconstkey(_opt_set, #_gconf_loc, true); \
         if (_opt_setting) \
             log_warn("Config option %s is no longer supported, and will become a syntax error in a future major version upgrade", #_gconf_loc); \
     } while (0)
@@ -329,9 +329,9 @@ cfg_t* conf_load(const vscf_data_t* cfg_root, const bool force_zsd)
     if (nsid_data_ascii)
         set_nsid_ascii(cfg, nsid_data_ascii);
 
-    vscf_data_t* stypes_cfg = cfg_root
-                              ? vscf_hash_get_data_byconstkey(cfg_root, "service_types", true)
-                              : NULL;
+    const vscf_data_t* stypes_cfg = cfg_root
+                                    ? vscf_hash_get_data_byconstkey(cfg_root, "service_types", true)
+                                    : NULL;
 
     // Phase 1 of service_types config
     gdnsd_mon_cfg_stypes_p1(stypes_cfg);
