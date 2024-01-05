@@ -135,7 +135,8 @@ static void plugin_extfile_add_mon_cname(const char* desc V_UNUSED, const char* 
         }
     }
 
-    gdnsd_assert(svc);
+    if (!svc)
+	log_fatal("plugin_extfile: BUG: did not find expected service_type %s", svc_name);
 
     svc->mons = xrealloc_n(svc->mons, svc->num_mons + 1, sizeof(*svc->mons));
     extf_mon_t* mon = &svc->mons[svc->num_mons];
@@ -157,7 +158,7 @@ static int moncmp(const void* x, const void* y)
     return strcmp(xm->name, ym->name);
 }
 
-F_NONNULLX(1, 2, 3)
+F_NONNULL
 static bool process_entry(const extf_svc_t* svc, const char* matchme, vscf_data_t* val, gdnsd_sttl_t* results)
 {
     bool success = false;
@@ -174,7 +175,6 @@ static bool process_entry(const extf_svc_t* svc, const char* matchme, vscf_data_
             const extf_mon_t findme = { matchme, 0, 0 };
             const extf_mon_t* found = bsearch(&findme, svc->mons, svc->num_mons, sizeof(findme), moncmp);
             if (found) {
-                gdnsd_assert(results);
                 results[found->midx] = result;
             } else {
                 log_warn("plugin_extfile: Service type '%s': entry '%s' in file '%s' ignored, did not match any configured resource!", svc->name, matchme, svc->path);
@@ -189,6 +189,11 @@ static bool process_entry(const extf_svc_t* svc, const char* matchme, vscf_data_
 F_NONNULL
 static void process_file(const extf_svc_t* svc)
 {
+    if (!svc->num_mons) {
+        log_warn("plugin_extfile: Service type '%s': NOT loading file '%s'; no resources are configured to use this service_type!", svc->name, svc->path);
+        return;
+    }
+
     vscf_data_t* raw = vscf_scan_filename(svc->path);
     if (!raw) {
         log_err("plugin_extfile: Service type '%s': loading file '%s' failed", svc->name, svc->path);
@@ -196,13 +201,12 @@ static void process_file(const extf_svc_t* svc)
     } else {
         if (!vscf_is_hash(raw)) {
             log_err("plugin_extfile: Service type '%s': top level of file '%s' must be a hash", svc->name, svc->path);
+            vscf_destroy(raw);
             return;
         }
     }
 
-    gdnsd_sttl_t* results = NULL;
-    if (svc->num_mons)
-        results = xmalloc_n(svc->num_mons, sizeof(*results));
+    gdnsd_sttl_t* results = xmalloc_n(svc->num_mons, sizeof(*results));
 
     // FORCED-bit below is temporary (within this function) as a flag
     //   to identify those entries which were not affected by file input.
@@ -242,8 +246,7 @@ static void process_file(const extf_svc_t* svc)
         log_err("plugin_extfile: Service type '%s': file load failed, no updates applied", svc->name);
     }
 
-    if (results)
-        free(results);
+    free(results);
 }
 
 F_NONNULL
@@ -251,7 +254,7 @@ static void timer_cb(struct ev_loop* loop, ev_timer* w, int revents V_UNUSED)
 {
     gdnsd_assert(revents == EV_TIMER);
 
-    extf_svc_t* svc = w->data;
+    const extf_svc_t* svc = w->data;
     gdnsd_assert(svc);
 
     if (svc->direct)
@@ -314,9 +317,11 @@ static void plugin_extfile_init_monitors(struct ev_loop* mon_loop V_UNUSED)
         extf_svc_t* svc = &service_types[i];
         // qsort() sets up for the bsearch() in process_file at runtime
         // aftwerwards, the midx values must be rewritten to the new order
-        qsort(svc->mons, svc->num_mons, sizeof(*svc->mons), moncmp);
-        for (unsigned j = 0; j < svc->num_mons; j++)
-            svc->mons[j].midx = j;
+        if (svc->num_mons) {
+            qsort(svc->mons, svc->num_mons, sizeof(*svc->mons), moncmp);
+            for (unsigned j = 0; j < svc->num_mons; j++)
+                svc->mons[j].midx = j;
+        }
         process_file(svc);
     }
 }

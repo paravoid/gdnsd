@@ -104,7 +104,7 @@ static int plugin_static_map_res(const char* resname, const uint8_t* zone_name)
                 }
                 if (!zone_name)
                     map_res_err("plugin_static: CNAME resource '%s' cannot be used for a DYNA record", resources[i].name);
-                uint8_t* dname = resources[i].dname;
+                const uint8_t* dname = resources[i].dname;
                 if (dname_isinzone(zone_name, dname))
                     map_res_err("plugin_static: Resource '%s' CNAME value '%s' cannot be used within zone '%s'", resources[i].name, logf_dname(dname), logf_dname(zone_name));
                 return (int)i;
@@ -187,7 +187,9 @@ static void add_mon_any(const char* svc_name, const unsigned idx)
             break;
         }
     }
-    gdnsd_assert(this_svc);
+
+    if (!this_svc)
+	log_fatal("plugin_static: BUG: did not find expected service_type %s", svc_name);
 
     static_mon_t* this_mon = xmalloc(sizeof(*this_mon));
     static_mons = xrealloc_n(static_mons, num_mons + 1, sizeof(*static_mons));
