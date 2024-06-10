@@ -20,7 +20,6 @@ override_dh_auto_configure:
 	dh_auto_configure -- \
 		--with-buildinfo=$(DEB_VERSION_UPSTREAM_REVISION) \
 		--with-rundir=/run \
-		--with-systemdsystemunitdir=/lib/systemd/system \
 		$(DEBUG)
 
 override_dh_auto_install:
