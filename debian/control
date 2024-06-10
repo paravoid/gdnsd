@@ -18,7 +18,7 @@ Build-Depends:
  libio-socket-inet6-perl <!nocheck>,
  libnet-dns-perl <!nocheck>,
  libsocket6-perl <!nocheck>,
-Standards-Version: 4.6.2
+Standards-Version: 4.7.0
 Rules-Requires-Root: no
 Homepage: https://gdnsd.org/
 Vcs-Browser: https://github.com/paravoid/gdnsd

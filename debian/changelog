@@ -5,8 +5,9 @@ gdnsd (3.8.2-2) UNRELEASED; urgency=medium
   * Avoid hardcoding systemdsystemunitdir, Build-Depending on
     pkgconf/systemd-dev instead. In this way, the build system automatically
     picks up the right path (/lib on bookworm-backports, /usr/lib on trixie+).
+  * Bump Standards-Version to 4.7.0.
 
- -- Faidon Liambotis <paravoid@debian.org>  Mon, 10 Jun 2024 16:16:15 +0300
+ -- Faidon Liambotis <paravoid@debian.org>  Mon, 10 Jun 2024 16:18:03 +0300
 
 gdnsd (3.8.2-1) unstable; urgency=medium
 
