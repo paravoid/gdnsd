@@ -1,4 +1,4 @@
-gdnsd (3.8.2-2) UNRELEASED; urgency=medium
+gdnsd (3.8.2-2) unstable; urgency=medium
 
   * Remove override for removed lintian tag
     package-supports-alternative-init-but-no-init.d-script.
@@ -7,7 +7,7 @@ gdnsd (3.8.2-2) UNRELEASED; urgency=medium
     picks up the right path (/lib on bookworm-backports, /usr/lib on trixie+).
   * Bump Standards-Version to 4.7.0.
 
- -- Faidon Liambotis <paravoid@debian.org>  Mon, 10 Jun 2024 16:18:03 +0300
+ -- Faidon Liambotis <paravoid@debian.org>  Mon, 10 Jun 2024 16:19:32 +0300
 
 gdnsd (3.8.2-1) unstable; urgency=medium
 
